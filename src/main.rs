@@ -16,12 +16,11 @@ struct Color {
 }
 
 impl Color {
-    fn to_rgba(&self) -> [u8; 4] {
-        [(self.r * 255.0) as u8,
-        (self.g * 255.0) as u8,
-        (self.b * 255.0) as u8,
-        (self.a * 255.0) as u8,
-        ]
+    fn to_rgba(&self) -> u32 {
+        (self.r * 255.0) as u32 |
+        ((self.g * 255.0) as u32) << 8 |
+        ((self.b * 255.0) as u32) << 16 |
+        ((self.a * 255.0) as u32) << 24
     }
 }
 
@@ -90,17 +89,15 @@ struct ColorBuffer {
 impl ColorBuffer {
     fn new(width: usize, height: usize) -> Self {
         let mut buffer = Vec::with_capacity(width * height);
-        for i in 0..HEIGHT {
-            for j in 0..WIDTH {
-                buffer.push(0);
-            }
+        // Initialize to black
+        for _i in 0..HEIGHT*WIDTH {
+            buffer.push(0);
         }
         Self {buffer, width, height}
     }
 
     fn set_pixel(&mut self, row: usize, col: usize, color: Color) {
-        let rgba = color.to_rgba();
-        self.buffer[row * self.width + col] = rgba[0] as u32 | (rgba[1] as u32) << 8 | (rgba[2] as u32) << 16 | (rgba[3] as u32) << 24;
+        self.buffer[row * self.width + col] = color.to_rgba();
     }
 
     fn get_raw(&self) -> &Vec<u32> {
