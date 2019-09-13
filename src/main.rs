@@ -1,6 +1,10 @@
 use core::ops::Sub;
 use minifb::{Key, WindowOptions, Window};
 
+use std::time::{Instant, Duration};
+
+use std::f32;
+
 #[derive(Debug, Copy, Clone)]
 struct Vec2 {
     pub x: f32,
@@ -38,13 +42,33 @@ impl Sub<Vec2> for Vec2 {
     }
 }
 
-#[derive(Debug)]
-struct Triangle {
-    points: [Vec2; 3],
-    normals: [Vec2; 3],
-    color: Color,
+struct PixelBoundingBox {
+    pub min_x: usize,
+    pub max_x: usize,
+    pub min_y: usize,
+    pub max_y: usize,
 }
 
+impl From<&[Vec2; 3]> for PixelBoundingBox {
+    fn from(points: &[Vec2; 3]) -> Self {
+        let vals = points
+            .iter()
+            .fold((f32::MAX, f32::MIN, f32::MAX, f32::MIN),
+                 |a, p| (a.0.min(p.x), a.1.max(p.x), a.2.min(p.y), a.3.max(p.y)));
+        let (min_x, max_x, min_y, max_y) = (vals.0.floor() as usize,
+                                           vals.1.ceil() as usize,
+                                           vals.2.floor() as usize,
+                                           vals.3.ceil() as usize);
+        Self {min_x, max_x, min_y, max_y}
+    }
+}
+
+#[derive(Debug)]
+struct Triangle {
+    pub points: [Vec2; 3],
+    normals: [Vec2; 3],
+    pub color: Color,
+}
 
 fn dot(a: Vec2, b: Vec2) -> f32 {
     a.x * b.x + a.y * b.y
@@ -67,15 +91,12 @@ impl Triangle {
         let n2 = Vec2::new(-v2.y, v2.x);
 
         let normals = [n0, n1, n2];
+
         Triangle {points, normals, color}
     }
 
     fn is_point_inside(&self, point: Vec2) -> bool {
         self.normals.iter().zip(self.points.iter()).fold(true, |acc, (&n, &p)| (dot(n, point-p) >= 0.0) && acc)
-    }
-
-    fn get_color(&self) -> Color {
-        self.color
     }
 }
 
@@ -90,10 +111,18 @@ impl ColorBuffer {
     fn new(width: usize, height: usize) -> Self {
         let mut buffer = Vec::with_capacity(width * height);
         // Initialize to black
-        for _i in 0..HEIGHT*WIDTH {
+        for _i in 0..width * height {
             buffer.push(0);
         }
         Self {buffer, width, height}
+    }
+
+    // Clear to black
+    fn clear(&mut self) {
+        assert_eq!(self.buffer.len(), self.height * self.width);
+        for i in 0..self.width * self.height {
+            self.buffer[i] = 0;
+        }
     }
 
     fn set_pixel(&mut self, row: usize, col: usize, color: Color) {
@@ -108,36 +137,65 @@ impl ColorBuffer {
 const WIDTH: usize = 800;
 const HEIGHT: usize = 800;
 
-// Returns RGBA image
-fn rasterize(triangles: Vec<Triangle>) -> ColorBuffer {
-    let width = WIDTH;
-    let height = HEIGHT;
-    let mut color_buffer = ColorBuffer::new(width, height);
-    for triangle in triangles {
-        for i in 0..height {
-            for j in 0..width {
-                // Sample middle of pixel
-                let x = j as f32 + 0.5;
-                let y = i as f32 + 0.5;
-                let pos = Vec2::new(x, y);
-                if triangle.is_point_inside(pos) {
-                    color_buffer.set_pixel(i, j, triangle.color);
+struct Rasterizer {
+    color_buffer: ColorBuffer,
+}
+
+impl Rasterizer {
+    fn new(width: usize, height: usize) -> Self {
+        Self {color_buffer: ColorBuffer::new(width, height)}
+    }
+
+    // Returns RGBA image
+    fn rasterize(&mut self, triangles: &[Triangle]) -> &ColorBuffer {
+        self.color_buffer.clear();
+        for triangle in triangles {
+            let bounding_box = PixelBoundingBox::from(&triangle.points);
+            for i in bounding_box.min_y..bounding_box.max_y {
+                for j in bounding_box.min_x..bounding_box.max_x {
+                    // Sample middle of pixel
+                    let x = j as f32 + 0.5;
+                    let y = i as f32 + 0.5;
+                    let pos = Vec2::new(x, y);
+                    if triangle.is_point_inside(pos) {
+                        self.color_buffer.set_pixel(i, j, triangle.color);
+                    }
                 }
             }
         }
-    }
 
-    color_buffer
+        &self.color_buffer
+    }
 }
 
-fn main() {
+fn get_triangle() -> Vec<Triangle> {
     let pos0 = Vec2::new(100.0, 100.0);
     let pos1 = Vec2::new(500.0, 100.0);
     let pos2 = Vec2::new(100.0, 300.0);
-    let color = Color{r: 0.5, g: 0.5, b: 0.5, a: 0.5};
+    let color = Color{r: 0.5, g: 0.5, b: 0.5, a: 1.0};
     let tri = Triangle::new([pos0, pos1, pos2], color);
-    let triangles = vec![tri];
-    let color_buffer = rasterize(triangles);
+    vec![tri]
+}
+
+fn get_triangles() -> Vec<Triangle> {
+    let mut triangles = Vec::new();
+
+    for i in (0..600).step_by(60) {
+        let pos0 = Vec2::new((100 + i) as f32, 200.0);
+        let pos1 = Vec2::new((100 + i + 50) as f32, 200 as f32);
+        let pos2 = Vec2::new((100 + i) as f32, 400.0);
+        let color = Color{r: (i + 100) as f32 / 700.0, g: 0.0, b: 0.0, a: 1.0};
+        triangles.push(Triangle::new([pos0, pos1, pos2], color));
+    }
+
+    triangles
+}
+
+fn main() {
+    let triangle = get_triangle();
+    let triangles = get_triangles();
+
+    let mut rasterizer = Rasterizer::new(WIDTH, HEIGHT);
 
     let mut window = Window::new("Test - ESC to exit",
                                  WIDTH,
@@ -146,7 +204,25 @@ fn main() {
         panic!("{}", e);
     });
 
+    let mut avg = Duration::new(0, 0);
+    let mut iterations = 0;
+
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        window.update_with_buffer(color_buffer.get_raw()).unwrap();
+        let t0 = Instant::now();
+        let color_buffer = rasterizer.rasterize(&triangles);
+        avg = (avg * iterations + t0.elapsed()) / (iterations + 1);
+        iterations += 1;
+
+        if iterations % 10 == 0 {
+            println!("{:?}", avg);
+        }
+
+        match window.update_with_buffer(color_buffer.get_raw()) {
+            Err(e) => {
+                println!("{}", e);
+                return;
+            }
+            Ok(_) => (),
+        }
     }
 }
