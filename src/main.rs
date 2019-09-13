@@ -1,15 +1,12 @@
-use core::ops::Sub;
-use minifb::{Key, WindowOptions, Window};
+use minifb::{Key, Window, WindowOptions};
 
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 use std::f32;
 
-#[derive(Debug, Copy, Clone)]
-struct Vec2 {
-    pub x: f32,
-    pub y: f32,
-}
+mod math_primitives;
+
+use crate::math_primitives::*;
 
 #[derive(Debug, Copy, Clone)]
 struct Color {
@@ -21,24 +18,10 @@ struct Color {
 
 impl Color {
     fn to_rgba(&self) -> u32 {
-        (self.r * 255.0) as u32 |
-        ((self.g * 255.0) as u32) << 8 |
-        ((self.b * 255.0) as u32) << 16 |
-        ((self.a * 255.0) as u32) << 24
-    }
-}
-
-impl Vec2 {
-    fn new(x: f32, y: f32) -> Self {
-        Self {x, y}
-    }
-}
-
-impl Sub<Vec2> for Vec2 {
-    type Output = Vec2;
-
-    fn sub(self, other: Vec2) -> Vec2 {
-        Vec2{x: self.x - other.x, y: self.y - other.y}
+        (self.r * 255.0) as u32
+            | ((self.g * 255.0) as u32) << 8
+            | ((self.b * 255.0) as u32) << 16
+            | ((self.a * 255.0) as u32) << 24
     }
 }
 
@@ -49,33 +32,37 @@ struct PixelBoundingBox {
     pub max_y: usize,
 }
 
-impl From<&[Vec2; 3]> for PixelBoundingBox {
-    fn from(points: &[Vec2; 3]) -> Self {
+impl From<&[Point2D; 3]> for PixelBoundingBox {
+    fn from(points: &[Point2D; 3]) -> Self {
         let vals = points
             .iter()
-            .fold((f32::MAX, f32::MIN, f32::MAX, f32::MIN),
-                 |a, p| (a.0.min(p.x), a.1.max(p.x), a.2.min(p.y), a.3.max(p.y)));
-        let (min_x, max_x, min_y, max_y) = (vals.0.floor() as usize,
-                                           vals.1.ceil() as usize,
-                                           vals.2.floor() as usize,
-                                           vals.3.ceil() as usize);
-        Self {min_x, max_x, min_y, max_y}
+            .fold((f32::MAX, f32::MIN, f32::MAX, f32::MIN), |a, p| {
+                (a.0.min(p.x), a.1.max(p.x), a.2.min(p.y), a.3.max(p.y))
+            });
+        let (min_x, max_x, min_y, max_y) = (
+            vals.0.floor() as usize,
+            vals.1.ceil() as usize,
+            vals.2.floor() as usize,
+            vals.3.ceil() as usize,
+        );
+        Self {
+            min_x,
+            max_x,
+            min_y,
+            max_y,
+        }
     }
 }
 
 #[derive(Debug)]
 struct Triangle {
-    pub points: [Vec2; 3],
-    normals: [Vec2; 3],
+    pub points: [Point2D; 3],
+    normals: [Vec2D; 3],
     pub color: Color,
 }
 
-fn dot(a: Vec2, b: Vec2) -> f32 {
-    a.x * b.x + a.y * b.y
-}
-
 impl Triangle {
-    fn new(points: [Vec2; 3], color: Color) -> Triangle {
+    fn new(points: [Point2D; 3], color: Color) -> Triangle {
         // Clockwise edge equations
         // To have the normals all pointing towards the inner part of the triangle,
         // they all need to have their positive halfspace to the right of the triangle.
@@ -86,17 +73,25 @@ impl Triangle {
         let v0 = points[1] - points[0];
         let v1 = points[2] - points[1];
         let v2 = points[0] - points[2];
-        let n0 = Vec2::new(-v0.y, v0.x);
-        let n1 = Vec2::new(-v1.y, v1.x);
-        let n2 = Vec2::new(-v2.y, v2.x);
+        let n0 = Vec2D::new(-v0.y, v0.x);
+        let n1 = Vec2D::new(-v1.y, v1.x);
+        let n2 = Vec2D::new(-v2.y, v2.x);
 
         let normals = [n0, n1, n2];
 
-        Triangle {points, normals, color}
+        Triangle {
+            points,
+            normals,
+            color,
+        }
     }
 
-    fn is_point_inside(&self, point: Vec2) -> bool {
-        self.normals.iter().zip(self.points.iter()).fold(true, |acc, (&n, &p)| (dot(n, point-p) >= 0.0) && acc)
+    fn is_point_inside(&self, point: Point2D) -> bool {
+        // Based on edge equations
+        self.normals
+            .iter()
+            .zip(self.points.iter())
+            .fold(true, |acc, (&n, &p)| (n.dot(point - p) >= 0.0) && acc)
     }
 }
 
@@ -114,7 +109,11 @@ impl ColorBuffer {
         for _i in 0..width * height {
             buffer.push(0);
         }
-        Self {buffer, width, height}
+        Self {
+            buffer,
+            width,
+            height,
+        }
     }
 
     // Clear to black
@@ -143,7 +142,9 @@ struct Rasterizer {
 
 impl Rasterizer {
     fn new(width: usize, height: usize) -> Self {
-        Self {color_buffer: ColorBuffer::new(width, height)}
+        Self {
+            color_buffer: ColorBuffer::new(width, height),
+        }
     }
 
     // Returns RGBA image
@@ -156,7 +157,7 @@ impl Rasterizer {
                     // Sample middle of pixel
                     let x = j as f32 + 0.5;
                     let y = i as f32 + 0.5;
-                    let pos = Vec2::new(x, y);
+                    let pos = Point2D::new(x, y);
                     if triangle.is_point_inside(pos) {
                         self.color_buffer.set_pixel(i, j, triangle.color);
                     }
@@ -169,10 +170,15 @@ impl Rasterizer {
 }
 
 fn get_triangle() -> Vec<Triangle> {
-    let pos0 = Vec2::new(100.0, 100.0);
-    let pos1 = Vec2::new(500.0, 100.0);
-    let pos2 = Vec2::new(100.0, 300.0);
-    let color = Color{r: 0.5, g: 0.5, b: 0.5, a: 1.0};
+    let pos0 = Point2D::new(100.0, 100.0);
+    let pos1 = Point2D::new(500.0, 100.0);
+    let pos2 = Point2D::new(100.0, 300.0);
+    let color = Color {
+        r: 0.5,
+        g: 0.5,
+        b: 0.5,
+        a: 1.0,
+    };
     let tri = Triangle::new([pos0, pos1, pos2], color);
     vec![tri]
 }
@@ -181,10 +187,15 @@ fn get_triangles() -> Vec<Triangle> {
     let mut triangles = Vec::new();
 
     for i in (0..600).step_by(60) {
-        let pos0 = Vec2::new((100 + i) as f32, 200.0);
-        let pos1 = Vec2::new((100 + i + 50) as f32, 200 as f32);
-        let pos2 = Vec2::new((100 + i) as f32, 400.0);
-        let color = Color{r: (i + 100) as f32 / 700.0, g: 0.0, b: 0.0, a: 1.0};
+        let pos0 = Point2D::new((100 + i) as f32, 200.0);
+        let pos1 = Point2D::new((100 + i + 50) as f32, 200 as f32);
+        let pos2 = Point2D::new((100 + i) as f32, 400.0);
+        let color = Color {
+            r: (i + 100) as f32 / 700.0,
+            g: 0.0,
+            b: 0.0,
+            a: 1.0,
+        };
         triangles.push(Triangle::new([pos0, pos1, pos2], color));
     }
 
@@ -197,10 +208,13 @@ fn main() {
 
     let mut rasterizer = Rasterizer::new(WIDTH, HEIGHT);
 
-    let mut window = Window::new("Test - ESC to exit",
-                                 WIDTH,
-                                 HEIGHT,
-                                 WindowOptions::default()).unwrap_or_else(|e| {
+    let mut window = Window::new(
+        "Test - ESC to exit",
+        WIDTH,
+        HEIGHT,
+        WindowOptions::default(),
+    )
+    .unwrap_or_else(|e| {
         panic!("{}", e);
     });
 
