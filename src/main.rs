@@ -2,9 +2,9 @@ use minifb::{Key, Window, WindowOptions};
 
 use std::time::{Duration, Instant};
 
-use std::f32;
-use core::ops::Mul;
 use core::ops::Add;
+use core::ops::Mul;
+use std::f32;
 
 mod math_primitives;
 
@@ -63,14 +63,24 @@ impl Mul<f32> for Color {
     type Output = Color;
 
     fn mul(self, scalar: f32) -> Color {
-        Color {r: self.r * scalar, g: self.g * scalar, b: self.b * scalar, a: self.a * scalar}
+        Color {
+            r: self.r * scalar,
+            g: self.g * scalar,
+            b: self.b * scalar,
+            a: self.a * scalar,
+        }
     }
 }
 
 impl Add<Color> for Color {
     type Output = Color;
     fn add(self, other: Color) -> Color {
-        Color {r: self.r + other.r, g: self.g + other.g, b: self.b + other.b, a: self.a + other.a}
+        Color {
+            r: self.r + other.r,
+            g: self.g + other.g,
+            b: self.b + other.b,
+            a: self.a + other.a,
+        }
     }
 }
 
@@ -161,7 +171,9 @@ impl Triangle {
         let barycentric1 = Triangle::area(&[self.vertices[2], self.vertices[0], point]) / self.area;
         let barycentric2 = 1.0 - barycentric0 - barycentric1;
 
-        self.vertex_attributes[0].color * barycentric0 + self.vertex_attributes[1].color * barycentric1 + self.vertex_attributes[2].color * barycentric2
+        self.vertex_attributes[0].color * barycentric0
+            + self.vertex_attributes[1].color * barycentric1
+            + self.vertex_attributes[2].color * barycentric2
     }
 }
 
@@ -248,9 +260,11 @@ fn get_triangle() -> Vec<Triangle> {
     let color1 = Color::green();
     let color2 = Color::blue();
 
-    let vertex_attributes = [VertexAttribute{color: color0},
-                             VertexAttribute{color: color1},
-                             VertexAttribute{color: color2}];
+    let vertex_attributes = [
+        VertexAttribute { color: color0 },
+        VertexAttribute { color: color1 },
+        VertexAttribute { color: color2 },
+    ];
 
     let tri = Triangle::new([pos0, pos1, pos2], vertex_attributes);
     vec![tri]
@@ -306,12 +320,9 @@ fn main() {
             println!("{:?}", avg);
         }
 
-        match window.update_with_buffer(color_buffer.get_raw()) {
-            Err(e) => {
-                println!("{}", e);
-                return;
-            }
-            Ok(_) => (),
+        if let Err(e) = window.update_with_buffer(color_buffer.get_raw()) {
+            println!("{}", e);
+            return;
         }
     }
 }

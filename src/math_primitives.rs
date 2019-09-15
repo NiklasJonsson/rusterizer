@@ -30,10 +30,6 @@ impl Vec2D {
     pub fn cross(self, other: Vec2D) -> f32 {
         self.x * other.y - other.x * self.y
     }
-
-    pub fn len(&self) -> f32 {
-        (self.x * self.x + self.y * self.y).sqrt()
-    }
 }
 
 impl Sub<Point2D> for Point2D {
