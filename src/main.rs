@@ -3,6 +3,8 @@ use minifb::{Key, Window, WindowOptions};
 use std::time::{Duration, Instant};
 
 use std::f32;
+use core::ops::Mul;
+use core::ops::Add;
 
 mod math_primitives;
 
@@ -23,6 +25,53 @@ impl Color {
             | ((self.b * 255.0) as u32) << 16
             | ((self.a * 255.0) as u32) << 24
     }
+
+    fn to_bgra(&self) -> u32 {
+        (self.b * 255.0) as u32
+            | ((self.g * 255.0) as u32) << 8
+            | ((self.r * 255.0) as u32) << 16
+            | ((self.a * 255.0) as u32) << 24
+    }
+
+    fn red() -> Color {
+        Color {
+            r: 1.0,
+            g: 0.0,
+            b: 0.0,
+            a: 1.0,
+        }
+    }
+    fn green() -> Color {
+        Color {
+            r: 0.0,
+            g: 1.0,
+            b: 0.0,
+            a: 1.0,
+        }
+    }
+    fn blue() -> Color {
+        Color {
+            r: 0.0,
+            g: 0.0,
+            b: 1.0,
+            a: 1.0,
+        }
+    }
+}
+
+impl Mul<f32> for Color {
+    type Output = Color;
+
+    fn mul(self, scalar: f32) -> Color {
+        Color {r: self.r * scalar, g: self.g * scalar, b: self.b * scalar, a: self.a * scalar}
+    }
+}
+
+impl Add<Color> for Color {
+    type Output = Color;
+    fn add(self, other: Color) -> Color {
+        Color {r: self.r + other.r, g: self.g + other.g, b: self.b + other.b, a: self.a + other.a}
+    }
 }
 
 struct PixelBoundingBox {
@@ -33,8 +82,8 @@ struct PixelBoundingBox {
 }
 
 impl From<&[Point2D; 3]> for PixelBoundingBox {
-    fn from(points: &[Point2D; 3]) -> Self {
-        let vals = points
+    fn from(vertices: &[Point2D; 3]) -> Self {
+        let vals = vertices
             .iter()
             .fold((f32::MAX, f32::MIN, f32::MAX, f32::MIN), |a, p| {
                 (a.0.min(p.x), a.1.max(p.x), a.2.min(p.y), a.3.max(p.y))
@@ -55,14 +104,24 @@ impl From<&[Point2D; 3]> for PixelBoundingBox {
 }
 
 #[derive(Debug)]
+struct VertexAttribute {
+    color: Color,
+}
+
+#[derive(Debug)]
 struct Triangle {
-    pub points: [Point2D; 3],
+    pub vertices: [Point2D; 3],
     normals: [Vec2D; 3],
-    pub color: Color,
+    pub vertex_attributes: [VertexAttribute; 3],
+    area: f32,
 }
 
 impl Triangle {
-    fn new(points: [Point2D; 3], color: Color) -> Triangle {
+    fn area(vertices: &[Point2D; 3]) -> f32 {
+        (vertices[1] - vertices[0]).cross(vertices[2] - vertices[0]) * 0.5
+    }
+
+    fn new(vertices: [Point2D; 3], vertex_attributes: [VertexAttribute; 3]) -> Triangle {
         // Clockwise edge equations
         // To have the normals all pointing towards the inner part of the triangle,
         // they all need to have their positive halfspace to the right of the triangle.
@@ -70,19 +129,21 @@ impl Triangle {
         // (and also switch order for v computations above. Note that coordinate system
         // starts in upper left corner.
 
-        let v0 = points[1] - points[0];
-        let v1 = points[2] - points[1];
-        let v2 = points[0] - points[2];
+        let v0 = vertices[1] - vertices[0];
+        let v1 = vertices[2] - vertices[1];
+        let v2 = vertices[0] - vertices[2];
         let n0 = Vec2D::new(-v0.y, v0.x);
         let n1 = Vec2D::new(-v1.y, v1.x);
         let n2 = Vec2D::new(-v2.y, v2.x);
 
         let normals = [n0, n1, n2];
+        let area = Triangle::area(&vertices);
 
         Triangle {
-            points,
+            vertices,
             normals,
-            color,
+            vertex_attributes,
+            area,
         }
     }
 
@@ -90,8 +151,17 @@ impl Triangle {
         // Based on edge equations
         self.normals
             .iter()
-            .zip(self.points.iter())
+            .zip(self.vertices.iter())
             .fold(true, |acc, (&n, &p)| (n.dot(point - p) >= 0.0) && acc)
+    }
+
+    fn interpolate_color_for(&self, point: Point2D) -> Color {
+        assert!(self.is_point_inside(point));
+        let barycentric0 = Triangle::area(&[self.vertices[1], self.vertices[2], point]) / self.area;
+        let barycentric1 = Triangle::area(&[self.vertices[2], self.vertices[0], point]) / self.area;
+        let barycentric2 = 1.0 - barycentric0 - barycentric1;
+
+        self.vertex_attributes[0].color * barycentric0 + self.vertex_attributes[1].color * barycentric1 + self.vertex_attributes[2].color * barycentric2
     }
 }
 
@@ -125,7 +195,7 @@ impl ColorBuffer {
     }
 
     fn set_pixel(&mut self, row: usize, col: usize, color: Color) {
-        self.buffer[row * self.width + col] = color.to_rgba();
+        self.buffer[row * self.width + col] = color.to_bgra();
     }
 
     fn get_raw(&self) -> &Vec<u32> {
@@ -151,7 +221,7 @@ impl Rasterizer {
     fn rasterize(&mut self, triangles: &[Triangle]) -> &ColorBuffer {
         self.color_buffer.clear();
         for triangle in triangles {
-            let bounding_box = PixelBoundingBox::from(&triangle.points);
+            let bounding_box = PixelBoundingBox::from(&triangle.vertices);
             for i in bounding_box.min_y..bounding_box.max_y {
                 for j in bounding_box.min_x..bounding_box.max_x {
                     // Sample middle of pixel
@@ -159,7 +229,8 @@ impl Rasterizer {
                     let y = i as f32 + 0.5;
                     let pos = Point2D::new(x, y);
                     if triangle.is_point_inside(pos) {
-                        self.color_buffer.set_pixel(i, j, triangle.color);
+                        let col = triangle.interpolate_color_for(pos);
+                        self.color_buffer.set_pixel(i, j, col);
                     }
                 }
             }
@@ -170,19 +241,22 @@ impl Rasterizer {
 }
 
 fn get_triangle() -> Vec<Triangle> {
-    let pos0 = Point2D::new(100.0, 100.0);
-    let pos1 = Point2D::new(500.0, 100.0);
-    let pos2 = Point2D::new(100.0, 300.0);
-    let color = Color {
-        r: 0.5,
-        g: 0.5,
-        b: 0.5,
-        a: 1.0,
-    };
-    let tri = Triangle::new([pos0, pos1, pos2], color);
+    let pos0 = Point2D::new(300.0, 100.0);
+    let pos1 = Point2D::new(400.0, 300.0);
+    let pos2 = Point2D::new(200.0, 300.0);
+    let color0 = Color::red();
+    let color1 = Color::green();
+    let color2 = Color::blue();
+
+    let vertex_attributes = [VertexAttribute{color: color0},
+                             VertexAttribute{color: color1},
+                             VertexAttribute{color: color2}];
+
+    let tri = Triangle::new([pos0, pos1, pos2], vertex_attributes);
     vec![tri]
 }
 
+/*
 fn get_triangles() -> Vec<Triangle> {
     let mut triangles = Vec::new();
 
@@ -201,10 +275,11 @@ fn get_triangles() -> Vec<Triangle> {
 
     triangles
 }
+*/
 
 fn main() {
-    let triangle = get_triangle();
-    let triangles = get_triangles();
+    let triangles = get_triangle();
+    //let triangles = get_triangles();
 
     let mut rasterizer = Rasterizer::new(WIDTH, HEIGHT);
 
@@ -227,7 +302,7 @@ fn main() {
         avg = (avg * iterations + t0.elapsed()) / (iterations + 1);
         iterations += 1;
 
-        if iterations % 10 == 0 {
+        if iterations % 100 == 0 {
             println!("{:?}", avg);
         }
 
