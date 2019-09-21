@@ -77,7 +77,6 @@ impl Add<Color> for Color {
     }
 }
 
-
 #[derive(Debug)]
 pub struct VertexAttribute {
     color: Color,
@@ -85,14 +84,14 @@ pub struct VertexAttribute {
 
 impl From<Color> for VertexAttribute {
     fn from(other: Color) -> VertexAttribute {
-        VertexAttribute {color: other}
+        VertexAttribute { color: other }
     }
 }
 
 #[derive(Debug)]
 pub struct Triangle {
     pub vertices: [Point2D; 3],
-    normals: [Vec2D; 3],
+    normals: [Vec2; 3],
     pub vertex_attributes: [VertexAttribute; 3],
     area: f32,
 }
@@ -102,8 +101,7 @@ impl Triangle {
         (vertices[1] - vertices[0]).cross(vertices[2] - vertices[0]) * 0.5
     }
 
-    pub fn new(vertices: [Point2D; 3], vertex_attributes: [VertexAttribute; 3]) -> Triangle
-    {
+    pub fn new(vertices: [Point2D; 3], vertex_attributes: [VertexAttribute; 3]) -> Triangle {
         // Clockwise edge equations
         // To have the normals all pointing towards the inner part of the triangle,
         // they all need to have their positive halfspace to the right of the triangle.
@@ -114,9 +112,9 @@ impl Triangle {
         let v0 = vertices[1] - vertices[0];
         let v1 = vertices[2] - vertices[1];
         let v2 = vertices[0] - vertices[2];
-        let n0 = Vec2D::new(-v0.y, v0.x);
-        let n1 = Vec2D::new(-v1.y, v1.x);
-        let n2 = Vec2D::new(-v2.y, v2.x);
+        let n0 = Vec2::new(-v0.y(), v0.x());
+        let n1 = Vec2::new(-v1.y(), v1.x());
+        let n2 = Vec2::new(-v2.y(), v2.x());
 
         let normals = [n0, n1, n2];
         let area = Triangle::area(&vertices);
@@ -129,7 +127,7 @@ impl Triangle {
         }
     }
 
-   pub fn is_point_inside(&self, point: Point2D) -> bool {
+    pub fn is_point_inside(&self, point: Point2D) -> bool {
         // Based on edge equations
         self.normals
             .iter()

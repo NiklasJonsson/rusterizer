@@ -1,13 +1,14 @@
+#![feature(const_generics)]
 use minifb::{Key, Window, WindowOptions};
 
 use std::time::{Duration, Instant};
 
-mod math_primitives;
 mod graphics_primitives;
+mod math_primitives;
 mod rasterizer;
 
-use crate::math_primitives::*;
 use crate::graphics_primitives::*;
+use crate::math_primitives::*;
 use crate::rasterizer::*;
 
 const WIDTH: usize = 800;
@@ -21,11 +22,7 @@ fn get_triangle() -> Vec<Triangle> {
     let color1 = Color::green();
     let color2 = Color::blue();
 
-    let vertex_attributes = [
-        color0.into(),
-        color1.into(),
-        color2.into(),
-    ];
+    let vertex_attributes = [color0.into(), color1.into(), color2.into()];
 
     let tri = Triangle::new([pos0, pos1, pos2], vertex_attributes);
     vec![tri]

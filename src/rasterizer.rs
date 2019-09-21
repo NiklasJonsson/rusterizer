@@ -15,7 +15,12 @@ impl From<&[Point2D; 3]> for PixelBoundingBox {
         let vals = vertices
             .iter()
             .fold((f32::MAX, f32::MIN, f32::MAX, f32::MIN), |a, p| {
-                (a.0.min(p.x), a.1.max(p.x), a.2.min(p.y), a.3.max(p.y))
+                (
+                    a.0.min(p.x()),
+                    a.1.max(p.x()),
+                    a.2.min(p.y()),
+                    a.3.max(p.y()),
+                )
             });
         // Convert the min/max bounds into pixel coordinates. Always round
         // away from the center of the box.
@@ -77,7 +82,6 @@ impl ColorBuffer {
         match self.format {
             ColorBufferFormat::BGRA => self.buffer[row * self.width + col] = color.to_bgra(),
             ColorBufferFormat::RGBA => self.buffer[row * self.width + col] = color.to_rgba(),
-
         }
     }
 
@@ -86,14 +90,50 @@ impl ColorBuffer {
     }
 }
 
+#[derive(Debug)]
+pub struct DepthBuffer {
+    buffer: Vec<f32>,
+    width: usize,
+    height: usize,
+}
+
+impl DepthBuffer {
+    pub fn new(width: usize, height: usize) -> Self {
+        let mut buffer = Vec::with_capacity(width * height);
+        // Initialize to max depth => everything will be in front
+        for _i in 0..width * height {
+            buffer.push(f32::MAX);
+        }
+        Self {
+            buffer,
+            width,
+            height,
+        }
+    }
+
+    // Clear to black
+    fn clear(&mut self) {
+        assert_eq!(self.buffer.len(), self.height * self.width);
+        for i in 0..self.width * self.height {
+            self.buffer[i] = f32::MAX;
+        }
+    }
+
+    fn get_depth_at(&self, row: usize, col: usize) -> f32 {
+        self.buffer[row * self.width + col]
+    }
+}
+
 pub struct Rasterizer {
     color_buffer: ColorBuffer,
+    depth_buffer: DepthBuffer,
 }
 
 impl Rasterizer {
     pub fn new(width: usize, height: usize) -> Self {
         Self {
             color_buffer: ColorBuffer::new(width, height, ColorBufferFormat::BGRA),
+            depth_buffer: DepthBuffer::new(width, height),
         }
     }
 
