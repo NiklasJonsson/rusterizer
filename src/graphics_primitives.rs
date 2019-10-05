@@ -1,9 +1,9 @@
 use core::ops::Add;
 use core::ops::Mul;
 
-use crate::math_primitives::*;
+use crate::math::*;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct Color {
     pub r: f32,
     pub g: f32,
@@ -77,9 +77,9 @@ impl Add<Color> for Color {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct VertexAttribute {
-    color: Color,
+    pub color: Color,
 }
 
 impl From<Color> for VertexAttribute {
@@ -88,61 +88,67 @@ impl From<Color> for VertexAttribute {
     }
 }
 
-#[derive(Debug)]
-pub struct Triangle {
-    pub vertices: [Point2D; 3],
-    normals: [Vec2; 3],
-    pub vertex_attributes: [VertexAttribute; 3],
-    area: f32,
+impl Mul<f32> for VertexAttribute {
+    type Output = Self;
+
+    fn mul(self, scalar: f32) -> Self::Output {
+        (self.color * scalar).into()
+    }
 }
 
-impl Triangle {
-    fn area(vertices: &[Point2D; 3]) -> f32 {
-        (vertices[1] - vertices[0]).cross(vertices[2] - vertices[0]) * 0.5
+impl Add for VertexAttribute {
+    type Output = Self;
+    fn add(self, other: VertexAttribute) -> Self::Output {
+        (self.color + other.color).into()
     }
+}
 
-    pub fn new(vertices: [Point2D; 3], vertex_attributes: [VertexAttribute; 3]) -> Triangle {
-        // Clockwise edge equations
-        // To have the normals all pointing towards the inner part of the triangle,
-        // they all need to have their positive halfspace to the right of the triangle.
-        // If we wanted counter-clockwise, then we switch signs on both x and y of normals
-        // (and also switch order for v computations above. Note that coordinate system
-        // starts in upper left corner.
+pub type Vertex<CS: CoordinateSystem> = Point<CS, 4>;
 
-        let v0 = vertices[1] - vertices[0];
-        let v1 = vertices[2] - vertices[1];
-        let v2 = vertices[0] - vertices[2];
-        let n0 = Vec2::new(-v0.y(), v0.x());
-        let n1 = Vec2::new(-v1.y(), v1.x());
-        let n2 = Vec2::new(-v2.y(), v2.x());
+pub struct Triangle<CS>
+    where CS: CoordinateSystem,
+{
+    pub vertices: [Vertex<CS>; 3],
+    pub vertex_attributes: [VertexAttribute; 3],
+}
 
-        let normals = [n0, n1, n2];
-        let area = Triangle::area(&vertices);
-
-        Triangle {
-            vertices,
-            normals,
-            vertex_attributes,
-            area,
-        }
+impl<CSF, CST> Mul<Mat3<CSF, CST>> for Triangle<CSF>
+    where CSF: CoordinateSystem,
+          CST: CoordinateSystem,
+{
+    type Output = Triangle<CST>;
+    fn mul(self, other: Mat3<CSF, CST>) -> Triangle<CST> {
+        unimplemented!();
     }
+}
 
-    pub fn is_point_inside(&self, point: Point2D) -> bool {
-        // Based on edge equations
-        self.normals
+impl<CSF, CST> Mul<Triangle<CSF>> for Mat4<CSF, CST>
+    where CSF: CoordinateSystem,
+          CST: CoordinateSystem,
+{
+    type Output = Triangle<CST>;
+    fn mul(self, other: Triangle<CSF>) -> Triangle<CST> {
+        unimplemented!();
+        /*
+        let vertices = other.vertices
             .iter()
-            .zip(self.vertices.iter())
-            .fold(true, |acc, (&n, &p)| (n.dot(point - p) >= 0.0) && acc)
+            .map(|&p| self * p)
+            .collect::<Vec<_>>()[0..3];
+
+        Triangle::<CST> {
+            vertices,
+            ..self
+        }
+        */
     }
+}
 
-    pub fn interpolate_color_for(&self, point: Point2D) -> Color {
-        assert!(self.is_point_inside(point));
-        let barycentric0 = Triangle::area(&[self.vertices[1], self.vertices[2], point]) / self.area;
-        let barycentric1 = Triangle::area(&[self.vertices[2], self.vertices[0], point]) / self.area;
-        let barycentric2 = 1.0 - barycentric0 - barycentric1;
 
-        self.vertex_attributes[0].color * barycentric0
-            + self.vertex_attributes[1].color * barycentric1
-            + self.vertex_attributes[2].color * barycentric2
+impl<CS> std::fmt::Debug for Triangle<CS>
+    where CS: PrintableType + CoordinateSystem,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Triangle: {:?}\n", self.vertices);
+        write!(f, "{:?} ", self.vertex_attributes)
     }
 }

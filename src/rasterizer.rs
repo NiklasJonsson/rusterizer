@@ -1,5 +1,7 @@
 use crate::graphics_primitives::*;
-use crate::math_primitives::*;
+use crate::math::*;
+
+use core::ops::{Add, Mul};
 
 use std::f32;
 
@@ -46,7 +48,6 @@ pub enum ColorBufferFormat {
     BGRA,
 }
 
-// RGBA image
 #[derive(Debug)]
 pub struct ColorBuffer {
     buffer: Vec<u32>,
@@ -119,8 +120,97 @@ impl DepthBuffer {
         }
     }
 
-    fn get_depth_at(&self, row: usize, col: usize) -> f32 {
+    fn get_depth(&self, row: usize, col: usize) -> f32 {
         self.buffer[row * self.width + col]
+    }
+
+    fn set_depth(&mut self, row: usize, col: usize, depth: f32) {
+        self.buffer[row * self.width + col] = depth;
+    }
+}
+
+struct RasterizerTriangle {
+    vertices: [Point2D; 3],
+    depth: [f32; 3],
+    normalized_depth: [f32; 3],
+    attributes: [VertexAttribute; 3],
+    line_normals: [Vec2; 3],
+    area: f32,
+}
+
+impl RasterizerTriangle {
+    fn area(vertices: &[Point2D; 3]) -> f32 {
+        (vertices[1] - vertices[0]).cross(vertices[2] - vertices[0]) * 0.5
+    }
+
+    pub fn new(vertices: [Point2D; 3], attributes: [VertexAttribute; 3]) -> Self {
+        unimplemented!();
+        // Clockwise edge equations
+        // To have the normals all pointing towards the inner part of the triangle,
+        // they all need to have their positive halfspace to the right of the triangle.
+        // If we wanted counter-clockwise, then we switch signs on both x and y of normals
+        // (and also switch order for v computations above. Note that coordinate system
+        // starts in upper left corner.
+
+        /*
+        let v0 = vertices[1] - vertices[0];
+        let v1 = vertices[2] - vertices[1];
+        let v2 = vertices[0] - vertices[2];
+        let n0 = vec2(-v0.y(), v0.x());
+        let n1 = vec2(-v1.y(), v1.x());
+        let n2 = vec2(-v2.y(), v2.x());
+
+        let line_normals = [n0, n1, n2];
+        let area = Self::area(&vertices);
+
+        Self {
+            vertices,
+            line_normals,
+            attributes,
+            area,
+        }
+        */
+    }
+
+    pub fn is_point_inside(&self, point: Point2D) -> bool {
+        // Based on edge equations
+        self.line_normals
+            .iter()
+            .zip(self.vertices.iter())
+            .fold(true, |acc, (&n, &p)| (n.dot(point - p) >= 0.0) && acc)
+    }
+
+    fn barycentrics_at(&self, point: Point2D) -> Barycentrics {
+        assert!(self.is_point_inside(point));
+        let barycentric0 = Self::area(&[self.vertices[1], self.vertices[2], point]) / self.area;
+        let barycentric1 = Self::area(&[self.vertices[2], self.vertices[0], point]) / self.area;
+        let barycentric2 = 1.0 - barycentric0 - barycentric1;
+
+        Barycentrics([barycentric0, barycentric1, barycentric2])
+    }
+
+    fn depth_at(&self, barys: &Barycentrics) -> f32 {
+        barys.interpolate(self.normalized_depth)
+    }
+
+    fn color_at(&self, barys: &Barycentrics) -> Color {
+        barys.interpolate(self.attributes).color
+    }
+}
+
+// TODO: Perspective correct
+// Rename to fragment?
+struct Barycentrics([f32; 3]);
+
+impl Barycentrics
+{
+    fn interpolate<T>(&self, vals: [T; 3]) -> T
+        where T: Default + Copy + Mul<f32, Output = T> + Add<Output = T>
+    {
+        self.0
+            .iter()
+            .zip(vals.iter())
+            .fold(T::default(), |acc, (&b, &v)| acc + v * b)
     }
 }
 
@@ -137,10 +227,55 @@ impl Rasterizer {
         }
     }
 
-    // Returns RGBA image
-    pub fn rasterize(&mut self, triangles: &[Triangle]) -> &ColorBuffer {
+    fn perspective_divide(triangle: &Triangle<ClipSpace>) -> Triangle<NDC> {
+        let old_verts = triangle.vertices;
+
+        let v0 = Vertex::<NDC>::new(
+            old_verts[0].x() / old_verts[0].w(),
+            old_verts[0].y() / old_verts[0].w(),
+            old_verts[0].z() / old_verts[0].w(),
+            old_verts[0].w(),
+        );
+
+        let v1 = Vertex::<NDC>::new(
+            old_verts[1].x() / old_verts[1].w(),
+            old_verts[1].y() / old_verts[1].w(),
+            old_verts[1].z() / old_verts[1].w(),
+            old_verts[1].w(),
+        );
+
+        let v2 = Vertex::<NDC>::new(
+            old_verts[2].x() / old_verts[2].w(),
+            old_verts[2].y() / old_verts[2].w(),
+            old_verts[2].z() / old_verts[2].w(),
+            old_verts[2].w(),
+        );
+
+        let vertices = [v0, v1, v2];
+        Triangle::<NDC> {
+            vertices,
+            vertex_attributes: triangle.vertex_attributes,
+        }
+    }
+
+    fn to_screen_space(&self, tri: &Triangle<NDC>) -> RasterizerTriangle {
+        unimplemented!();
+    }
+
+    fn query_depth(&self, row: usize, col: usize) -> f32 {
+        self.depth_buffer.get_depth(row, col)
+    }
+
+    fn write_pixel(&mut self, row: usize, col: usize, color: Color, depth: f32) {
+        self.color_buffer.set_pixel(row, col, color);
+        self.depth_buffer.set_depth(row, col, depth);
+    }
+
+    pub fn rasterize(&mut self, triangles: &[Triangle<ClipSpace>]) -> &ColorBuffer {
         self.color_buffer.clear();
         for triangle in triangles {
+            let triangle = Rasterizer::perspective_divide(triangle);
+            let triangle = self.to_screen_space(&triangle);
             let bounding_box = PixelBoundingBox::from(&triangle.vertices);
             for i in bounding_box.min_y..bounding_box.max_y {
                 for j in bounding_box.min_x..bounding_box.max_x {
@@ -149,8 +284,14 @@ impl Rasterizer {
                     let y = i as f32 + 0.5;
                     let pos = Point2D::new(x, y);
                     if triangle.is_point_inside(pos) {
-                        let col = triangle.interpolate_color_for(pos);
-                        self.color_buffer.set_pixel(i, j, col);
+                        let barys = triangle.barycentrics_at(pos);
+                        let tri_depth = triangle.depth_at(&barys);
+                        if self.query_depth(i, j) < tri_depth {
+                            continue;
+                        }
+
+                        let col = triangle.color_at(&barys);
+                        self.write_pixel(i, j, col, tri_depth);
                     }
                 }
             }
@@ -158,4 +299,5 @@ impl Rasterizer {
 
         &self.color_buffer
     }
+
 }
