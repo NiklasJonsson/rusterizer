@@ -54,6 +54,10 @@ fn main() {
         panic!("{}", e);
     });
 
+    let v = vec3::<WorldSpace>(0.0, 0.1, 0.2);
+    let v1 = vec3::<WorldSpace>(0.0, 0.1, 0.2);
+    println!("{:?}", v * 3.0);
+
     let mut avg = Duration::new(0, 0);
     let mut iterations = 0;
 

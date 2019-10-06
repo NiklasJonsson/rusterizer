@@ -106,15 +106,17 @@ impl Add for VertexAttribute {
 pub type Vertex<CS: CoordinateSystem> = Point<CS, 4>;
 
 pub struct Triangle<CS>
-    where CS: CoordinateSystem,
+where
+    CS: CoordinateSystem,
 {
     pub vertices: [Vertex<CS>; 3],
     pub vertex_attributes: [VertexAttribute; 3],
 }
 
 impl<CSF, CST> Mul<Mat3<CSF, CST>> for Triangle<CSF>
-    where CSF: CoordinateSystem,
-          CST: CoordinateSystem,
+where
+    CSF: CoordinateSystem,
+    CST: CoordinateSystem,
 {
     type Output = Triangle<CST>;
     fn mul(self, other: Mat3<CSF, CST>) -> Triangle<CST> {
@@ -123,8 +125,9 @@ impl<CSF, CST> Mul<Mat3<CSF, CST>> for Triangle<CSF>
 }
 
 impl<CSF, CST> Mul<Triangle<CSF>> for Mat4<CSF, CST>
-    where CSF: CoordinateSystem,
-          CST: CoordinateSystem,
+where
+    CSF: CoordinateSystem,
+    CST: CoordinateSystem,
 {
     type Output = Triangle<CST>;
     fn mul(self, other: Triangle<CSF>) -> Triangle<CST> {
@@ -143,9 +146,9 @@ impl<CSF, CST> Mul<Triangle<CSF>> for Mat4<CSF, CST>
     }
 }
 
-
 impl<CS> std::fmt::Debug for Triangle<CS>
-    where CS: PrintableType + CoordinateSystem,
+where
+    CS: PrintableType + CoordinateSystem,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Triangle: {:?}\n", self.vertices);

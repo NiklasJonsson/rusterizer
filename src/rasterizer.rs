@@ -202,10 +202,10 @@ impl RasterizerTriangle {
 // Rename to fragment?
 struct Barycentrics([f32; 3]);
 
-impl Barycentrics
-{
+impl Barycentrics {
     fn interpolate<T>(&self, vals: [T; 3]) -> T
-        where T: Default + Copy + Mul<f32, Output = T> + Add<Output = T>
+    where
+        T: Default + Copy + Mul<f32, Output = T> + Add<Output = T>,
     {
         self.0
             .iter()
@@ -299,5 +299,4 @@ impl Rasterizer {
 
         &self.color_buffer
     }
-
 }

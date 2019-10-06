@@ -1,9 +1,9 @@
-pub mod vector;
-pub mod point;
 pub mod matrix;
-pub use crate::math::vector::*;
-pub use crate::math::point::*;
+pub mod point;
+pub mod vector;
 pub use crate::math::matrix::*;
+pub use crate::math::point::*;
+pub use crate::math::vector::*;
 
 pub trait PrintableType {
     const NAME: &'static str;
@@ -22,9 +22,9 @@ pub struct NDC;
 #[derive(Copy, Clone)]
 pub struct ScreenSpace;
 
-pub trait CoordinateSystem { }
+pub trait CoordinateSystem {}
 
-impl CoordinateSystem for Any2D { }
+impl CoordinateSystem for Any2D {}
 impl PrintableType for Any2D {
     const NAME: &'static str = "Any2D";
 }
