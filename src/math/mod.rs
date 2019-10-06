@@ -9,7 +9,7 @@ pub trait PrintableType {
     const NAME: &'static str;
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub struct Any2D;
 #[derive(Copy, Clone)]
 pub struct WorldSpace;
@@ -22,7 +22,7 @@ pub struct NDC;
 #[derive(Copy, Clone)]
 pub struct ScreenSpace;
 
-pub trait CoordinateSystem {}
+pub trait CoordinateSystem : Copy + Clone {}
 
 impl CoordinateSystem for Any2D {}
 impl PrintableType for Any2D {

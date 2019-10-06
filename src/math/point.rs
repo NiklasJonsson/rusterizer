@@ -67,13 +67,13 @@ where
     }
 }
 
-impl<CSF, CST> Mul<Point4D<CSF>> for Mat4<CSF, CST>
+impl<CSF, CST, const N: usize, const NN: usize> Mul<Point<CSF, {N}>> for Matrix<CSF, CST, {NN}>
 where
     CSF: CoordinateSystem,
     CST: CoordinateSystem,
 {
-    type Output = Point4D<CST>;
-    fn mul(self, other: Point4D<CSF>) -> Self::Output {
-        Point::<CST, 4>(self * other.0)
+    type Output = Point<CST, {N}>;
+    fn mul(self, other: Point<CSF, {N}>) -> Self::Output {
+        Point::<CST, {N}>(self * other.0)
     }
 }

@@ -105,23 +105,13 @@ impl Add for VertexAttribute {
 
 pub type Vertex<CS: CoordinateSystem> = Point<CS, 4>;
 
+const N_VERTICES: usize = 3;
 pub struct Triangle<CS>
 where
     CS: CoordinateSystem,
 {
-    pub vertices: [Vertex<CS>; 3],
-    pub vertex_attributes: [VertexAttribute; 3],
-}
-
-impl<CSF, CST> Mul<Mat3<CSF, CST>> for Triangle<CSF>
-where
-    CSF: CoordinateSystem,
-    CST: CoordinateSystem,
-{
-    type Output = Triangle<CST>;
-    fn mul(self, other: Mat3<CSF, CST>) -> Triangle<CST> {
-        unimplemented!();
-    }
+    pub vertices: [Vertex<CS>; N_VERTICES],
+    pub vertex_attributes: [VertexAttribute; N_VERTICES],
 }
 
 impl<CSF, CST> Mul<Triangle<CSF>> for Mat4<CSF, CST>
@@ -131,18 +121,17 @@ where
 {
     type Output = Triangle<CST>;
     fn mul(self, other: Triangle<CSF>) -> Triangle<CST> {
-        unimplemented!();
-        /*
-        let vertices = other.vertices
-            .iter()
-            .map(|&p| self * p)
-            .collect::<Vec<_>>()[0..3];
+        let Triangle{ vertices: verts, vertex_attributes: attrs} = other;
+        let vertices = [
+            self * verts[0],
+            self * verts[1],
+            self * verts[2],
+        ];
 
         Triangle::<CST> {
             vertices,
-            ..self
+            vertex_attributes: attrs,
         }
-        */
     }
 }
 
@@ -151,7 +140,7 @@ where
     CS: PrintableType + CoordinateSystem,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Triangle: {:?}\n", self.vertices);
+        write!(f, "Triangle: {:?}\n", self.vertices)?;
         write!(f, "{:?} ", self.vertex_attributes)
     }
 }

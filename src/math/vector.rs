@@ -7,7 +7,7 @@ use crate::math::*;
 #[derive(Copy, Clone)]
 pub struct Vector<CS: CoordinateSystem, const N: usize> {
     arr: [f32; N],
-    _coordinate_system: PhantomData<CS>,
+    coordinate_system: PhantomData<CS>,
 }
 
 // TODO: Implement generic operators as well
@@ -37,6 +37,27 @@ where
 
     pub fn len(&self) -> f32 {
         self.arr.iter().fold(0.0, |acc, e| acc + e * e).sqrt()
+    }
+
+    pub fn as_coordinate_system<CST>(self) -> Vector<CST, {N}>
+    where CST: CoordinateSystem,
+    {
+        Vector::<CST, {N}> {
+            arr: self.arr,
+            coordinate_system: PhantomData
+        }
+    }
+}
+
+impl<CS, const N: usize> From<[f32; N]> for Vector<CS, { N }>
+where
+    CS: CoordinateSystem,
+{
+    fn from(arr: [f32; N]) -> Self {
+        Self {
+            arr,
+            coordinate_system: PhantomData,
+        }
     }
 }
 
@@ -118,7 +139,7 @@ pub type Vec2 = Vector<Any2D, { 2 }>;
 pub fn vec2(x: f32, y: f32) -> Vec2 {
     Vector::<Any2D, { 2 }> {
         arr: [x, y],
-        _coordinate_system: PhantomData {},
+        coordinate_system: PhantomData {},
     }
 }
 
@@ -135,7 +156,7 @@ pub type Vec3<CS> = Vector<CS, { 3 }>;
 pub fn vec3<CS: CoordinateSystem>(x: f32, y: f32, z: f32) -> Vec3<CS> {
     Vector::<CS, { 3 }> {
         arr: [x, y, z],
-        _coordinate_system: PhantomData {},
+        coordinate_system: PhantomData {},
     }
 }
 
@@ -154,17 +175,18 @@ pub type Vec4<CS> = Vector<CS, { 4 }>;
 pub fn vec4<CS: CoordinateSystem>(x: f32, y: f32, z: f32, w: f32) -> Vec4<CS> {
     Vec4::<CS> {
         arr: [x, y, z, w],
-        _coordinate_system: PhantomData {},
+        coordinate_system: PhantomData {},
     }
 }
 
-impl<CSF, CST> Mul<Vec4<CSF>> for Mat4<CSF, CST>
+impl<CSF, CST, const N: usize, const NN: usize> Mul<Vector<CSF, {N}>> for Matrix<CSF, CST, {NN}>
 where
     CSF: CoordinateSystem,
     CST: CoordinateSystem,
 {
-    type Output = Vec4<CST>;
-    fn mul(self, other: Vec4<CSF>) -> Vec4<CST> {
+    type Output = Vector<CST, {N}>;
+    fn mul(self, other: Vector<CSF, {N}>) -> Self::Output {
+        // TODO: dot product between rows of matrix + other
         unimplemented!();
     }
 }
