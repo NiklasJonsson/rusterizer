@@ -131,8 +131,8 @@ impl DepthBuffer {
 
 struct RasterizerTriangle {
     vertices: [Point2D; 3],
-    depth: [f32; 3],
-    normalized_depth: [f32; 3],
+    depths: [f32; 3],
+    normalized_depths: [f32; 3],
     attributes: [VertexAttribute; 3],
     line_normals: [Vec2; 3],
     area: f32,
@@ -143,8 +143,8 @@ impl RasterizerTriangle {
         (vertices[1] - vertices[0]).cross(vertices[2] - vertices[0]) * 0.5
     }
 
-    pub fn new(vertices: [Point2D; 3], attributes: [VertexAttribute; 3]) -> Self {
-        unimplemented!();
+    pub fn new(vertices: [Point2D; 3], depths: [f32; 3], normalized_depths: [f32;3],
+               attributes: [VertexAttribute; 3]) -> Self {
         // Clockwise edge equations
         // To have the normals all pointing towards the inner part of the triangle,
         // they all need to have their positive halfspace to the right of the triangle.
@@ -152,7 +152,6 @@ impl RasterizerTriangle {
         // (and also switch order for v computations above. Note that coordinate system
         // starts in upper left corner.
 
-        /*
         let v0 = vertices[1] - vertices[0];
         let v1 = vertices[2] - vertices[1];
         let v2 = vertices[0] - vertices[2];
@@ -165,11 +164,12 @@ impl RasterizerTriangle {
 
         Self {
             vertices,
-            line_normals,
+            depths,
+            normalized_depths,
             attributes,
+            line_normals,
             area,
         }
-        */
     }
 
     pub fn is_point_inside(&self, point: Point2D) -> bool {
@@ -190,7 +190,7 @@ impl RasterizerTriangle {
     }
 
     fn depth_at(&self, barys: &Barycentrics) -> f32 {
-        barys.interpolate(self.normalized_depth)
+        barys.interpolate(self.normalized_depths)
     }
 
     fn color_at(&self, barys: &Barycentrics) -> Color {
@@ -217,11 +217,15 @@ impl Barycentrics {
 pub struct Rasterizer {
     color_buffer: ColorBuffer,
     depth_buffer: DepthBuffer,
+    width: usize,
+    height: usize,
 }
 
 impl Rasterizer {
     pub fn new(width: usize, height: usize) -> Self {
         Self {
+            width,
+            height,
             color_buffer: ColorBuffer::new(width, height, ColorBufferFormat::BGRA),
             depth_buffer: DepthBuffer::new(width, height),
         }
@@ -259,7 +263,28 @@ impl Rasterizer {
     }
 
     fn to_screen_space(&self, tri: &Triangle<NDC>) -> RasterizerTriangle {
-        unimplemented!();
+        let new_vert = |vert: Vertex<NDC>| {
+            Point2D::new(vert.x() * self.width as f32, vert.y() * self.height as f32)
+        };
+        let vertices = [
+            new_vert(tri.vertices[0]),
+            new_vert(tri.vertices[1]),
+            new_vert(tri.vertices[2]),
+        ];
+
+        let depths = [
+            tri.vertices[0].w(),
+            tri.vertices[1].w(),
+            tri.vertices[2].w(),
+        ];
+
+        let normalized_depths = [
+            tri.vertices[0].z(),
+            tri.vertices[1].z(),
+            tri.vertices[2].z(),
+        ];
+
+        RasterizerTriangle::new(vertices, depths, normalized_depths, tri.vertex_attributes)
     }
 
     fn query_depth(&self, row: usize, col: usize) -> f32 {
