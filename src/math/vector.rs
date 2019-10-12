@@ -39,13 +39,20 @@ where
         self.arr.iter().fold(0.0, |acc, e| acc + e * e).sqrt()
     }
 
-    pub fn as_coordinate_system<CST>(self) -> Vector<CST, {N}>
-    where CST: CoordinateSystem,
+    pub fn as_coordinate_system<CST>(self) -> Vector<CST, { N }>
+    where
+        CST: CoordinateSystem,
     {
-        Vector::<CST, {N}> {
+        Vector::<CST, { N }> {
             arr: self.arr,
-            coordinate_system: PhantomData
+            coordinate_system: PhantomData,
         }
+    }
+
+    // FIXME: This is only needed since the compiler crashes
+    // if we destruct (pattern match) the Vector to get the contents
+    fn contents(self) -> [f32;N] {
+        self.arr
     }
 }
 
@@ -58,6 +65,15 @@ where
             arr,
             coordinate_system: PhantomData,
         }
+    }
+}
+
+impl<CS, const N: usize> Into<[f32; N]> for Vector<CS, { N }>
+where
+    CS: CoordinateSystem,
+{
+    fn into(self) -> [f32; N] {
+        self.arr
     }
 }
 
@@ -179,14 +195,22 @@ pub fn vec4<CS: CoordinateSystem>(x: f32, y: f32, z: f32, w: f32) -> Vec4<CS> {
     }
 }
 
-impl<CSF, CST, const N: usize, const NN: usize> Mul<Vector<CSF, {N}>> for Matrix<CSF, CST, {NN}>
+impl<CSF, CST, const N: usize> Mul<Vector<CSF, { N }>> for Matrix<CSF, CST, { N }>
 where
     CSF: CoordinateSystem,
     CST: CoordinateSystem,
 {
-    type Output = Vector<CST, {N}>;
-    fn mul(self, other: Vector<CSF, {N}>) -> Self::Output {
-        // TODO: dot product between rows of matrix + other
-        unimplemented!();
+    type Output = Vector<CST, { N }>;
+    fn mul(self, other: Vector<CSF, { N }>) -> Self::Output {
+        let arr = other.contents();
+        let mut result = arr.clone();
+        for i in 0..N {
+            let row: Vector::<CSF, {N}> = self.row(i).into();
+            result[i] = row.dot(other).into();
+        }
+        Self::Output {
+            arr: result,
+            coordinate_system: PhantomData,
+        }
     }
 }

@@ -121,12 +121,11 @@ where
 {
     type Output = Triangle<CST>;
     fn mul(self, other: Triangle<CSF>) -> Triangle<CST> {
-        let Triangle{ vertices: verts, vertex_attributes: attrs} = other;
-        let vertices = [
-            self * verts[0],
-            self * verts[1],
-            self * verts[2],
-        ];
+        let Triangle {
+            vertices: verts,
+            vertex_attributes: attrs,
+        } = other;
+        let vertices = [self * verts[0], self * verts[1], self * verts[2]];
 
         Triangle::<CST> {
             vertices,

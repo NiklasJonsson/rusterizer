@@ -22,7 +22,7 @@ pub struct NDC;
 #[derive(Copy, Clone)]
 pub struct ScreenSpace;
 
-pub trait CoordinateSystem : Copy + Clone {}
+pub trait CoordinateSystem: Copy + Clone {}
 
 impl CoordinateSystem for Any2D {}
 impl PrintableType for Any2D {

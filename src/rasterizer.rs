@@ -143,8 +143,12 @@ impl RasterizerTriangle {
         (vertices[1] - vertices[0]).cross(vertices[2] - vertices[0]) * 0.5
     }
 
-    pub fn new(vertices: [Point2D; 3], depths: [f32; 3], normalized_depths: [f32;3],
-               attributes: [VertexAttribute; 3]) -> Self {
+    pub fn new(
+        vertices: [Point2D; 3],
+        depths: [f32; 3],
+        normalized_depths: [f32; 3],
+        attributes: [VertexAttribute; 3],
+    ) -> Self {
         // Clockwise edge equations
         // To have the normals all pointing towards the inner part of the triangle,
         // they all need to have their positive halfspace to the right of the triangle.
