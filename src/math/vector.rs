@@ -51,7 +51,7 @@ where
 
     // FIXME: This is only needed since the compiler crashes
     // if we destruct (pattern match) the Vector to get the contents
-    fn contents(self) -> [f32;N] {
+    fn contents(self) -> [f32; N] {
         self.arr
     }
 }
@@ -205,7 +205,7 @@ where
         let arr = other.contents();
         let mut result = arr.clone();
         for i in 0..N {
-            let row: Vector::<CSF, {N}> = self.row(i).into();
+            let row: Vector<CSF, { N }> = self.row(i).into();
             result[i] = row.dot(other).into();
         }
         Self::Output {
