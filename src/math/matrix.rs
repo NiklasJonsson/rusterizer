@@ -66,7 +66,7 @@ where
         for i in 0..N {
             for j in 0..N {
                 let r: Vector<CSF, { N }> = self.row(i).into();
-                let c: Vector<CSF, { N }> = other.col(i).into();
+                let c: Vector<CSF, { N }> = other.col(j).into();
                 result[i][j] = r.dot(c).into();
             }
         }
@@ -98,3 +98,47 @@ where
         result
     }
 }
+
+impl<CSF, CST> Mat4<CSF, CST>
+where
+    CSF: CoordinateSystem,
+    CST: CoordinateSystem,
+{
+    pub fn identity() -> Self {
+        let mut array = [[0.0f32; {4}]; {4}];
+
+        for i in 0..4 {
+            array[i][i] = 1.0;
+        }
+
+        Self {
+            array,
+            _to_coordinate_space: PhantomData,
+            _from_coordinate_space: PhantomData,
+        }
+    }
+}
+
+impl<CSF, CST, const N: usize> std::fmt::Debug for Matrix<CSF, CST,{ N }>
+where
+    CSF: PrintableType + CoordinateSystem,
+    CST: PrintableType + CoordinateSystem,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = self
+            .array
+            .iter()
+            .map(|row| {
+                format!("[{}]",
+                        row
+                        .iter()
+                        .map(|x| format!("{}", x))
+                        .collect::<Vec<_>>()
+                        .join(", "))
+            })
+            .collect::<Vec<_>>()
+            .join("\n  ");
+        write!(f, "Matrix<{}, {}, {}>:\n[\n  {}\n]", CSF::NAME, CST::NAME, N, s)
+    }
+}
+
