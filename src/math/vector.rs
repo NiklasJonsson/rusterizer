@@ -48,12 +48,6 @@ where
             coordinate_system: PhantomData,
         }
     }
-
-    // FIXME: This is only needed since the compiler crashes
-    // if we destruct (pattern match) the Vector to get the contents
-    fn contents(self) -> [f32; N] {
-        self.arr
-    }
 }
 
 impl<CS, const N: usize> From<[f32; N]> for Vector<CS, { N }>
@@ -138,16 +132,17 @@ where
     CS: PrintableType + CoordinateSystem,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TODO: Avoid trainling comma
         let s = self
             .arr
             .iter()
-            .map(|elem| format!("{:?}", elem))
+            .map(|elem| format!("{:?}, ", elem))
             // How many chars per float? No idea, 32 should be enough
             .fold(String::with_capacity(N * 32), |mut acc, s| {
                 acc.push_str(&s);
                 acc
             });
-        write!(f, "Vector<{}, {}>: {}", N, CS::NAME, s)
+        write!(f, "Vector<{}, {}>: [{}]", CS::NAME, N, s)
     }
 }
 
@@ -202,7 +197,10 @@ where
 {
     type Output = Vector<CST, { N }>;
     fn mul(self, other: Vector<CSF, { N }>) -> Self::Output {
-        let arr = other.contents();
+        let Vector {
+           arr,
+           coordinate_system: _,
+        } = other;
         let mut result = arr.clone();
         for i in 0..N {
             let row: Vector<CSF, { N }> = self.row(i).into();

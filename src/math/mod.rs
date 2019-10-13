@@ -11,14 +11,29 @@ pub trait PrintableType {
 
 #[derive(Copy, Clone)]
 pub struct Any2D;
+
+/// The transformations below oncur in the following order(with transform):
+/// World  ->  Camera   ->   Clip        ->         NDC    ->    Screen
+///       view      projection    perspective_divide  mul_w_viewport
+
+/// The coordinate system in which the models/triangle are position relative towards
+/// eachother and the camera.
 #[derive(Copy, Clone)]
 pub struct WorldSpace;
+
+/// Similar to WorldSpace, except the origin is at the position of the camera.
 #[derive(Copy, Clone)]
 pub struct CameraSpace;
+
+/// This space ranges from -1, 1 and everything that is outside may be clipped
 #[derive(Copy, Clone)]
 pub struct ClipSpace;
+
+/// Normalized Device Coordinates
 #[derive(Copy, Clone)]
 pub struct NDC;
+
+/// x: [0..screen_width] and y: [0..screen_height]
 #[derive(Copy, Clone)]
 pub struct ScreenSpace;
 
@@ -55,5 +70,5 @@ impl PrintableType for ScreenSpace {
 }
 
 pub fn project(near: f32, far: f32, aspect_ration: f32) -> Mat4<CameraSpace, ClipSpace> {
-    unimplemented!();
+    Mat4::identity()
 }

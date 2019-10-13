@@ -103,7 +103,14 @@ impl Add for VertexAttribute {
     }
 }
 
-pub type Vertex<CS: CoordinateSystem> = Point<CS, 4>;
+pub type Vertex<CS: CoordinateSystem> = Point4D<CS>;
+
+pub fn vertex<CS>(x: f32, y: f32, z: f32) -> Vertex<CS>
+where
+    CS: CoordinateSystem
+{
+    Vertex::<CS>::new(x,y,z,1.0)
+}
 
 const N_VERTICES: usize = 3;
 pub struct Triangle<CS>
@@ -139,7 +146,11 @@ where
     CS: PrintableType + CoordinateSystem,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Triangle: {:?}\n", self.vertices)?;
-        write!(f, "{:?} ", self.vertex_attributes)
+        write!(f, "Triangle:\n")?;
+        for i in 0..3 {
+            write!(f, "  {}:\n    {:?}\n    {:?}\n", i, self.vertices[i], self.vertex_attributes[i])?;
+        }
+
+        Ok(())
     }
 }

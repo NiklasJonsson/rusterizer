@@ -15,32 +15,45 @@ use crate::rasterizer::*;
 const WIDTH: usize = 800;
 const HEIGHT: usize = 800;
 
-/*
-fn get_triangle() -> Vec<Triangle> {
-    let pos0 = Point2D::new(300.0, 100.0);
-    let pos1 = Point2D::new(400.0, 300.0);
-    let pos2 = Point2D::new(200.0, 300.0);
+fn get_triangles() -> Vec<Triangle<WorldSpace>> {
+    let pos0 = vertex(0.3, 0.1, 0.0);
+    let pos1 = vertex(0.4, 0.3, 0.0);
+    let pos2 = vertex(0.2, 0.3, 0.0);
     let color0 = Color::red();
-    let color1 = Color::green();
-    let color2 = Color::blue();
+    let color1 = Color::red();
+    let color2 = Color::red();
 
     let vertex_attributes = [color0.into(), color1.into(), color2.into()];
 
-    let tri = Triangle::new([pos0, pos1, pos2], vertex_attributes);
-    vec![tri]
-}
-*/
+    let tri = Triangle {
+        vertices: [pos0, pos1, pos2],
+        vertex_attributes
+    };
 
-fn get_triangles() -> Vec<Triangle<WorldSpace>> {
-    unimplemented!();
+    // Triangle 2, slightly shifted to the left
+    let pos0 = vertex(0.4, 0.1, 50.0);
+    let pos1 = vertex(0.5, 0.3, 50.0);
+    let pos2 = vertex(0.3, 0.3, 50.0);
+    let color0 = Color::green();
+    let color1 = Color::green();
+    let color2 = Color::green();
+
+    let vertex_attributes = [color0.into(), color1.into(), color2.into()];
+
+    let tri2 = Triangle {
+        vertices: [pos0, pos1, pos2],
+        vertex_attributes,
+    };
+    vec![tri, tri2]
 }
 
 fn get_view_matrix() -> Mat4<WorldSpace, CameraSpace> {
-    unimplemented!();
+    Mat4::identity()
 }
 
 fn main() {
     let triangles = get_triangles();
+    println!("{:?}", triangles);
 
     let mut rasterizer = Rasterizer::new(WIDTH, HEIGHT);
 
@@ -59,10 +72,16 @@ fn main() {
 
     let view_matrix = get_view_matrix();
     let proj_matrix = project(2.0, 100.0, 2.0);
+    dbg!(proj_matrix);
+    dbg!(view_matrix);
+    dbg!(proj_matrix * view_matrix);
     let triangles = triangles
         .into_iter()
         .map(|tri| proj_matrix * view_matrix * tri)
+        .map(|tri| dbg!(tri))
         .collect::<Vec<_>>();
+
+    println!("{:?}", triangles);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         let t0 = Instant::now();
