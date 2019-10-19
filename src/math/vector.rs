@@ -10,7 +10,6 @@ pub struct Vector<CS: CoordinateSystem, const N: usize> {
     coordinate_system: PhantomData<CS>,
 }
 
-// TODO: Implement generic operators as well
 impl<CS, const N: usize> Vector<CS, { N }>
 where
     CS: CoordinateSystem,

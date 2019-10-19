@@ -141,4 +141,3 @@ where
         write!(f, "Matrix<{}, {}, {}>:\n[\n  {}\n]", CSF::NAME, CST::NAME, N, s)
     }
 }
-

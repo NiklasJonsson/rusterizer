@@ -16,9 +16,9 @@ const WIDTH: usize = 800;
 const HEIGHT: usize = 800;
 
 fn get_triangles() -> Vec<Triangle<WorldSpace>> {
-    let pos0 = vertex(0.3, 0.1, 0.0);
-    let pos1 = vertex(0.4, 0.3, 0.0);
-    let pos2 = vertex(0.2, 0.3, 0.0);
+    let pos0 = vertex(0.3, 0.1, -3.0);
+    let pos1 = vertex(0.4, 0.3, -3.0);
+    let pos2 = vertex(0.2, 0.3, -3.0);
     let color0 = Color::red();
     let color1 = Color::red();
     let color2 = Color::red();
@@ -31,9 +31,9 @@ fn get_triangles() -> Vec<Triangle<WorldSpace>> {
     };
 
     // Triangle 2, slightly shifted to the left
-    let pos0 = vertex(0.4, 0.1, 50.0);
-    let pos1 = vertex(0.5, 0.3, 50.0);
-    let pos2 = vertex(0.3, 0.3, 50.0);
+    let pos0 = vertex(0.4, 0.1, -2.0);
+    let pos1 = vertex(0.5, 0.3, -2.0);
+    let pos2 = vertex(0.3, 0.3, -2.0);
     let color0 = Color::green();
     let color1 = Color::green();
     let color2 = Color::green();
@@ -48,6 +48,7 @@ fn get_triangles() -> Vec<Triangle<WorldSpace>> {
 }
 
 fn get_view_matrix() -> Mat4<WorldSpace, CameraSpace> {
+    // TODO
     Mat4::identity()
 }
 
@@ -71,17 +72,12 @@ fn main() {
     let mut iterations = 0;
 
     let view_matrix = get_view_matrix();
-    let proj_matrix = project(2.0, 100.0, 2.0);
-    dbg!(proj_matrix);
-    dbg!(view_matrix);
-    dbg!(proj_matrix * view_matrix);
+    let proj_matrix = project(2.0, 100.0, HEIGHT as f32 / WIDTH as f32, std::f32::consts::FRAC_PI_2);
     let triangles = triangles
         .into_iter()
         .map(|tri| proj_matrix * view_matrix * tri)
-        .map(|tri| dbg!(tri))
         .collect::<Vec<_>>();
 
-    println!("{:?}", triangles);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         let t0 = Instant::now();

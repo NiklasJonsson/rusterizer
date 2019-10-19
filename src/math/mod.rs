@@ -14,7 +14,7 @@ pub struct Any2D;
 
 /// The transformations below oncur in the following order(with transform):
 /// World  ->  Camera   ->   Clip        ->         NDC    ->    Screen
-///       view      projection    perspective_divide  mul_w_viewport
+///       view      projection    perspective_divide  viewport_transform
 
 /// The coordinate system in which the models/triangle are position relative towards
 /// eachother and the camera.
@@ -22,14 +22,16 @@ pub struct Any2D;
 pub struct WorldSpace;
 
 /// Similar to WorldSpace, except the origin is at the position of the camera.
+/// Also known as view space
 #[derive(Copy, Clone)]
 pub struct CameraSpace;
 
 /// This space ranges from -1, 1 and everything that is outside may be clipped
+/// Also known as projection space
 #[derive(Copy, Clone)]
 pub struct ClipSpace;
 
-/// Normalized Device Coordinates
+/// Normalized Device Coordinates, x and y have been divided by the depth
 #[derive(Copy, Clone)]
 pub struct NDC;
 
@@ -37,7 +39,7 @@ pub struct NDC;
 #[derive(Copy, Clone)]
 pub struct ScreenSpace;
 
-pub trait CoordinateSystem: Copy + Clone {}
+pub trait CoordinateSystem: Copy + Clone + PrintableType {}
 
 impl CoordinateSystem for Any2D {}
 impl PrintableType for Any2D {
@@ -69,6 +71,13 @@ impl PrintableType for ScreenSpace {
     const NAME: &'static str = "ScreenSpace";
 }
 
-pub fn project(near: f32, far: f32, aspect_ration: f32) -> Mat4<CameraSpace, ClipSpace> {
-    Mat4::identity()
+// See https://www.songho.ca/opengl/gl_projectionmatrix.html for derivation
+pub fn project(near: f32, far: f32, aspect_ratio: f32, vert_fov: f32) -> Mat4<CameraSpace, ClipSpace> {
+    let half_width = (vert_fov / 2.0).tan() * near;
+    let half_height = aspect_ratio * half_width;
+
+    mat4(near/half_width, 0.0, 0.0, 0.0,
+         0.0, near/half_height, 0.0, 0.0,
+         0.0, 0.0, -(far + near)/(far - near), -2.0 * far * near / (far - near),
+         0.0, 0.0, -1.0, 0.0)
 }

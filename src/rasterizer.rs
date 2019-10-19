@@ -129,6 +129,7 @@ impl DepthBuffer {
     }
 }
 
+// Implicitly in 2D Screen space
 struct RasterizerTriangle {
     vertices: [Point2D; 3],
     depths: [f32; 3],
@@ -203,7 +204,7 @@ impl RasterizerTriangle {
 }
 
 // TODO: Perspective correct
-// Rename to fragment?
+// Rename to fragment and use Attributes internally?
 struct Barycentrics([f32; 3]);
 
 impl Barycentrics {
@@ -235,6 +236,7 @@ impl Rasterizer {
         }
     }
 
+    // Divide x, y and z by w
     fn perspective_divide(triangle: &Triangle<ClipSpace>) -> Triangle<NDC> {
         let old_verts = triangle.vertices;
 
@@ -266,7 +268,8 @@ impl Rasterizer {
         }
     }
 
-    fn to_screen_space(&self, tri: &Triangle<NDC>) -> RasterizerTriangle {
+    // Transform to screen space (RasterizerTriangle is implicitly in this space)
+    fn viewport_transform(&self, tri: &Triangle<NDC>) -> RasterizerTriangle {
         let new_vert = |vert: Vertex<NDC>| {
             Point2D::new(vert.x() * self.width as f32, vert.y() * self.height as f32)
         };
@@ -300,11 +303,20 @@ impl Rasterizer {
         self.depth_buffer.set_depth(row, col, depth);
     }
 
+    fn can_cull(triangle: &Triangle<ClipSpace>) -> bool {
+        return triangle.vertices.iter().all(|x| x.w() <= 0.0);
+    }
+
     pub fn rasterize(&mut self, triangles: &[Triangle<ClipSpace>]) -> &ColorBuffer {
         self.color_buffer.clear();
+        self.depth_buffer.clear();
         for triangle in triangles {
+            if Rasterizer::can_cull(triangle) {
+                continue;
+            }
+
             let triangle = Rasterizer::perspective_divide(triangle);
-            let triangle = self.to_screen_space(&triangle);
+            let triangle = self.viewport_transform(&triangle);
             let bounding_box = PixelBoundingBox::from(&triangle.vertices);
             for i in bounding_box.min_y..bounding_box.max_y {
                 for j in bounding_box.min_x..bounding_box.max_x {
