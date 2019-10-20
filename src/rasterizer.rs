@@ -139,6 +139,16 @@ struct RasterizerTriangle {
     area: f32,
 }
 
+fn interpolate<T>(barys: &[f32; 3], vals: [T; 3]) -> T
+where
+    T: Default + Copy + Mul<f32, Output = T> + Add<Output = T>,
+{
+    barys
+        .iter()
+        .zip(vals.iter())
+        .fold(T::default(), |acc, (&b, &v)| acc + v * b)
+}
+
 impl RasterizerTriangle {
     fn area(vertices: &[Point2D; 3]) -> f32 {
         (vertices[1] - vertices[0]).cross(vertices[2] - vertices[0]) * 0.5
@@ -185,38 +195,27 @@ impl RasterizerTriangle {
             .fold(true, |acc, (&n, &p)| (n.dot(point - p) >= 0.0) && acc)
     }
 
-    fn barycentrics_at(&self, point: Point2D) -> Barycentrics {
+    fn fragment_at(&self, point: Point2D) -> Fragment {
         assert!(self.is_point_inside(point));
         let barycentric0 = Self::area(&[self.vertices[1], self.vertices[2], point]) / self.area;
         let barycentric1 = Self::area(&[self.vertices[2], self.vertices[0], point]) / self.area;
         let barycentric2 = 1.0 - barycentric0 - barycentric1;
 
-        Barycentrics([barycentric0, barycentric1, barycentric2])
-    }
+        let barys = [barycentric0, barycentric1, barycentric2];
 
-    fn depth_at(&self, barys: &Barycentrics) -> f32 {
-        barys.interpolate(self.normalized_depths)
-    }
+        // It might be benificial to separate these two in the future but
+        // only interpolating a color is so cheap it is not worthwhile.
+        let depth = interpolate(&barys, self.normalized_depths);
+        let attribute = interpolate(&barys, self.attributes);
 
-    fn color_at(&self, barys: &Barycentrics) -> Color {
-        barys.interpolate(self.attributes).color
+        Fragment { depth, attribute }
     }
 }
 
 // TODO: Perspective correct
-// Rename to fragment and use Attributes internally?
-struct Barycentrics([f32; 3]);
-
-impl Barycentrics {
-    fn interpolate<T>(&self, vals: [T; 3]) -> T
-    where
-        T: Default + Copy + Mul<f32, Output = T> + Add<Output = T>,
-    {
-        self.0
-            .iter()
-            .zip(vals.iter())
-            .fold(T::default(), |acc, (&b, &v)| acc + v * b)
-    }
+struct Fragment {
+    pub depth: f32,
+    pub attribute: VertexAttribute,
 }
 
 pub struct Rasterizer {
@@ -325,14 +324,13 @@ impl Rasterizer {
                     let y = i as f32 + 0.5;
                     let pos = Point2D::new(x, y);
                     if triangle.is_point_inside(pos) {
-                        let barys = triangle.barycentrics_at(pos);
-                        let tri_depth = triangle.depth_at(&barys);
-                        if self.query_depth(i, j) < tri_depth {
+                        let fragment = triangle.fragment_at(pos);
+                        if self.query_depth(i, j) < fragment.depth {
                             continue;
                         }
 
-                        let col = triangle.color_at(&barys);
-                        self.write_pixel(i, j, col, tri_depth);
+                        let col = fragment.attribute.color;
+                        self.write_pixel(i, j, col, fragment.depth);
                     }
                 }
             }

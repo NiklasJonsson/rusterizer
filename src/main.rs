@@ -27,7 +27,7 @@ fn get_triangles() -> Vec<Triangle<WorldSpace>> {
 
     let tri = Triangle {
         vertices: [pos0, pos1, pos2],
-        vertex_attributes
+        vertex_attributes,
     };
 
     // Triangle 2, slightly shifted to the left
@@ -72,12 +72,16 @@ fn main() {
     let mut iterations = 0;
 
     let view_matrix = get_view_matrix();
-    let proj_matrix = project(2.0, 100.0, HEIGHT as f32 / WIDTH as f32, std::f32::consts::FRAC_PI_2);
+    let proj_matrix = project(
+        2.0,
+        100.0,
+        HEIGHT as f32 / WIDTH as f32,
+        std::f32::consts::FRAC_PI_2,
+    );
     let triangles = triangles
         .into_iter()
         .map(|tri| proj_matrix * view_matrix * tri)
         .collect::<Vec<_>>();
-
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         let t0 = Instant::now();

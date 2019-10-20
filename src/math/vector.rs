@@ -197,8 +197,8 @@ where
     type Output = Vector<CST, { N }>;
     fn mul(self, other: Vector<CSF, { N }>) -> Self::Output {
         let Vector {
-           arr,
-           coordinate_system: _,
+            arr,
+            coordinate_system: _,
         } = other;
         let mut result = arr.clone();
         for i in 0..N {

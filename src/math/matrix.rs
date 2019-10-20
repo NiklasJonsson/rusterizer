@@ -105,7 +105,7 @@ where
     CST: CoordinateSystem,
 {
     pub fn identity() -> Self {
-        let mut array = [[0.0f32; {4}]; {4}];
+        let mut array = [[0.0f32; { 4 }]; { 4 }];
 
         for i in 0..4 {
             array[i][i] = 1.0;
@@ -119,7 +119,7 @@ where
     }
 }
 
-impl<CSF, CST, const N: usize> std::fmt::Debug for Matrix<CSF, CST,{ N }>
+impl<CSF, CST, const N: usize> std::fmt::Debug for Matrix<CSF, CST, { N }>
 where
     CSF: PrintableType + CoordinateSystem,
     CST: PrintableType + CoordinateSystem,
@@ -129,15 +129,23 @@ where
             .array
             .iter()
             .map(|row| {
-                format!("[{}]",
-                        row
-                        .iter()
+                format!(
+                    "[{}]",
+                    row.iter()
                         .map(|x| format!("{}", x))
                         .collect::<Vec<_>>()
-                        .join(", "))
+                        .join(", ")
+                )
             })
             .collect::<Vec<_>>()
             .join("\n  ");
-        write!(f, "Matrix<{}, {}, {}>:\n[\n  {}\n]", CSF::NAME, CST::NAME, N, s)
+        write!(
+            f,
+            "Matrix<{}, {}, {}>:\n[\n  {}\n]",
+            CSF::NAME,
+            CST::NAME,
+            N,
+            s
+        )
     }
 }
