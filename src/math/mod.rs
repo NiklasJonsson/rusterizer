@@ -1,8 +1,10 @@
 pub mod matrix;
 pub mod point;
+pub mod transform;
 pub mod vector;
 pub use crate::math::matrix::*;
 pub use crate::math::point::*;
+pub use crate::math::transform::*;
 pub use crate::math::vector::*;
 
 pub trait PrintableType {

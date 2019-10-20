@@ -1,5 +1,4 @@
-use core::ops::Mul;
-use core::ops::Sub;
+use core::ops::{Mul, Sub};
 
 use crate::math::*;
 
@@ -30,6 +29,10 @@ where
     CS: CoordinateSystem,
 {
     impl_accessors!(x, y, z, w);
+}
+
+pub fn origin() -> Point4D<WorldSpace> {
+    Point4D::<WorldSpace>::new(0.0, 0.0, 0.0, 0.0)
 }
 
 impl Point2D {
