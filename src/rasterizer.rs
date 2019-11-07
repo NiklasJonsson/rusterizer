@@ -5,6 +5,7 @@ use core::ops::{Add, Mul};
 
 use std::f32;
 
+#[derive(Debug)]
 struct PixelBoundingBox {
     pub min_x: usize,
     pub max_x: usize,
@@ -32,7 +33,8 @@ impl From<&[Point2D; 3]> for PixelBoundingBox {
             vals.2.floor() as usize,
             vals.3.ceil() as usize,
         );
-        assert!(min_x < max_x && min_y < max_y);
+        assert!(min_x < max_x, "{} < {}", min_x, max_x);
+        assert!(min_y < max_y, "{} < {}", min_y, max_y);
         Self {
             min_x,
             max_x,
@@ -130,6 +132,7 @@ impl DepthBuffer {
 }
 
 // Implicitly in 2D Screen space
+#[derive(Debug)]
 struct RasterizerTriangle {
     vertices: [Point2D; 3],
     depths: [f32; 3],
@@ -170,9 +173,9 @@ impl RasterizerTriangle {
         let v0 = vertices[1] - vertices[0];
         let v1 = vertices[2] - vertices[1];
         let v2 = vertices[0] - vertices[2];
-        let n0 = vec2(-v0.y(), v0.x());
-        let n1 = vec2(-v1.y(), v1.x());
-        let n2 = vec2(-v2.y(), v2.x());
+        let n0 = vec2(-v0.y(), v0.x()).normalize();
+        let n1 = vec2(-v1.y(), v1.x()).normalize();
+        let n2 = vec2(-v2.y(), v2.x()).normalize();
 
         let line_normals = [n0, n1, n2];
         let area = Self::area(&vertices);
@@ -243,21 +246,21 @@ impl Rasterizer {
             old_verts[0].x() / old_verts[0].w(),
             old_verts[0].y() / old_verts[0].w(),
             old_verts[0].z() / old_verts[0].w(),
-            old_verts[0].w(),
+            old_verts[0].w() / old_verts[0].w(),
         );
 
         let v1 = Vertex::<NDC>::new(
             old_verts[1].x() / old_verts[1].w(),
             old_verts[1].y() / old_verts[1].w(),
             old_verts[1].z() / old_verts[1].w(),
-            old_verts[1].w(),
+            old_verts[1].w() / old_verts[1].w(),
         );
 
         let v2 = Vertex::<NDC>::new(
             old_verts[2].x() / old_verts[2].w(),
             old_verts[2].y() / old_verts[2].w(),
             old_verts[2].z() / old_verts[2].w(),
-            old_verts[2].w(),
+            old_verts[2].w() / old_verts[2].w(),
         );
 
         let vertices = [v0, v1, v2];
@@ -270,7 +273,9 @@ impl Rasterizer {
     // Transform to screen space (RasterizerTriangle is implicitly in this space)
     fn viewport_transform(&self, tri: &Triangle<NDC>) -> RasterizerTriangle {
         let new_vert = |vert: Vertex<NDC>| {
-            Point2D::new(vert.x() * self.width as f32, vert.y() * self.height as f32)
+            let x = self.width as f32 * (vert.x() + 1.0) / 2.0;
+            let y = self.height as f32 * (vert.y() + 1.0) / 2.0;
+            Point2D::new(x, y)
         };
         let vertices = [
             new_vert(tri.vertices[0]),
@@ -337,5 +342,33 @@ impl Rasterizer {
         }
 
         &self.color_buffer
+    }
+
+    pub fn draw(&mut self, triangles: &[Triangle<ClipSpace>]) -> &ColorBuffer {
+        self.rasterize(triangles)
+    }
+
+    pub fn draw_indirect(
+        &mut self,
+        vertex_buf: &[Vertex<ClipSpace>],
+        attr_buf: &[VertexAttribute],
+        idx_buf: &[usize],
+    ) -> &ColorBuffer {
+        let mut triangles = Vec::with_capacity(idx_buf.len() / 3);
+        for idxs in idx_buf.chunks(3) {
+            let vertices = [
+                vertex_buf[idxs[0]],
+                vertex_buf[idxs[1]],
+                vertex_buf[idxs[2]],
+            ];
+            let vertex_attributes = [attr_buf[idxs[0]], attr_buf[idxs[1]], attr_buf[idxs[2]]];
+
+            triangles.push(Triangle {
+                vertices,
+                vertex_attributes,
+            });
+        }
+
+        self.rasterize(&triangles)
     }
 }

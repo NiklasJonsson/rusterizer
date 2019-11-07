@@ -14,7 +14,7 @@ pub trait PrintableType {
 #[derive(Copy, Clone)]
 pub struct Any2D;
 
-/// The transformations below oncur in the following order(with transform):
+/// The transformations below oncur in the following order (with transform):
 /// World  ->  Camera   ->   Clip        ->         NDC    ->    Screen
 ///       view      projection    perspective_divide  viewport_transform
 
