@@ -1,4 +1,4 @@
-use core::ops::{Mul, Sub};
+use core::ops::{Div, Mul, Sub};
 
 use crate::math::*;
 
@@ -7,7 +7,7 @@ macro_rules! impl_accessor {
         pub fn $name(&self) -> f32 {
             (self.0).$name()
         }
-    }
+    };
 }
 
 macro_rules! impl_accessors {
@@ -58,6 +58,17 @@ where
 
     fn sub(self, other: Self) -> Self::Output {
         self.0 - other.0
+    }
+}
+
+impl<CS, const N: usize> Div<f32> for Point<CS, { N }>
+where
+    CS: CoordinateSystem,
+{
+    type Output = Point<CS, { N }>;
+
+    fn div(self, other: f32) -> Self::Output {
+        Self(self.0 / other)
     }
 }
 

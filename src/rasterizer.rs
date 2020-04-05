@@ -114,7 +114,6 @@ impl DepthBuffer {
         }
     }
 
-    // Clear to black
     fn clear(&mut self) {
         assert_eq!(self.buffer.len(), self.height * self.width);
         for i in 0..self.width * self.height {
@@ -136,7 +135,6 @@ impl DepthBuffer {
 struct RasterizerTriangle {
     vertices: [Point2D; 3],
     depths: [f32; 3],
-    normalized_depths: [f32; 3],
     attributes: [VertexAttribute; 3],
     line_normals: [Vec2; 3],
     area: f32,
@@ -157,12 +155,7 @@ impl RasterizerTriangle {
         (vertices[1] - vertices[0]).cross(vertices[2] - vertices[0]) * 0.5
     }
 
-    pub fn new(
-        vertices: [Point2D; 3],
-        depths: [f32; 3],
-        normalized_depths: [f32; 3],
-        attributes: [VertexAttribute; 3],
-    ) -> Self {
+    pub fn new(vertices: [Point2D; 3], depths: [f32; 3], attributes: [VertexAttribute; 3]) -> Self {
         // Clockwise edge equations
         // To have the normals all pointing towards the inner part of the triangle,
         // they all need to have their positive halfspace to the right of the triangle.
@@ -183,7 +176,6 @@ impl RasterizerTriangle {
         Self {
             vertices,
             depths,
-            normalized_depths,
             attributes,
             line_normals,
             area,
@@ -208,7 +200,7 @@ impl RasterizerTriangle {
 
         // It might be benificial to separate these two in the future but
         // only interpolating a color is so cheap it is not worthwhile.
-        let depth = interpolate(&barys, self.normalized_depths);
+        let depth = interpolate(&barys, self.depths);
         let attribute = interpolate(&barys, self.attributes);
 
         Fragment { depth, attribute }
@@ -274,7 +266,8 @@ impl Rasterizer {
     fn viewport_transform(&self, tri: &Triangle<NDC>) -> RasterizerTriangle {
         let new_vert = |vert: Vertex<NDC>| {
             let x = self.width as f32 * (vert.x() + 1.0) / 2.0;
-            let y = self.height as f32 * (vert.y() + 1.0) / 2.0;
+            // Flip y as color buffer start upper left
+            let y = self.height as f32 * (1.0 - (vert.y() + 1.0) / 2.0);
             Point2D::new(x, y)
         };
         let vertices = [
@@ -284,18 +277,12 @@ impl Rasterizer {
         ];
 
         let depths = [
-            tri.vertices[0].w(),
-            tri.vertices[1].w(),
-            tri.vertices[2].w(),
-        ];
-
-        let normalized_depths = [
             tri.vertices[0].z(),
             tri.vertices[1].z(),
             tri.vertices[2].z(),
         ];
 
-        RasterizerTriangle::new(vertices, depths, normalized_depths, tri.vertex_attributes)
+        RasterizerTriangle::new(vertices, depths, tri.vertex_attributes)
     }
 
     fn query_depth(&self, row: usize, col: usize) -> f32 {
@@ -311,6 +298,27 @@ impl Rasterizer {
         return triangle.vertices.iter().all(|x| x.w() <= 0.0);
     }
 
+    fn rasterize_triangle(&mut self, triangle: &RasterizerTriangle) {
+        let bounding_box = PixelBoundingBox::from(&triangle.vertices);
+        for i in bounding_box.min_y..bounding_box.max_y {
+            for j in bounding_box.min_x..bounding_box.max_x {
+                // Sample middle of pixel
+                let x = j as f32 + 0.5;
+                let y = i as f32 + 0.5;
+                let pos = Point2D::new(x, y);
+                if triangle.is_point_inside(pos) {
+                    let fragment = triangle.fragment_at(pos);
+                    if self.query_depth(i, j) < fragment.depth {
+                        continue;
+                    }
+
+                    let col = fragment.attribute.color;
+                    self.write_pixel(i, j, col, fragment.depth);
+                }
+            }
+        }
+    }
+
     pub fn rasterize(&mut self, triangles: &[Triangle<ClipSpace>]) -> &ColorBuffer {
         self.color_buffer.clear();
         self.depth_buffer.clear();
@@ -321,24 +329,7 @@ impl Rasterizer {
 
             let triangle = Rasterizer::perspective_divide(triangle);
             let triangle = self.viewport_transform(&triangle);
-            let bounding_box = PixelBoundingBox::from(&triangle.vertices);
-            for i in bounding_box.min_y..bounding_box.max_y {
-                for j in bounding_box.min_x..bounding_box.max_x {
-                    // Sample middle of pixel
-                    let x = j as f32 + 0.5;
-                    let y = i as f32 + 0.5;
-                    let pos = Point2D::new(x, y);
-                    if triangle.is_point_inside(pos) {
-                        let fragment = triangle.fragment_at(pos);
-                        if self.query_depth(i, j) < fragment.depth {
-                            continue;
-                        }
-
-                        let col = fragment.attribute.color;
-                        self.write_pixel(i, j, col, fragment.depth);
-                    }
-                }
-            }
+            self.rasterize_triangle(&triangle);
         }
 
         &self.color_buffer
@@ -372,3 +363,19 @@ impl Rasterizer {
         self.rasterize(&triangles)
     }
 }
+
+/*
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rasterize_triangle() {
+        let r = Rasterizer::new(100, 100);
+        let p0 = Point2D::new(
+        let tri = RasterizerTriangle::new(
+            vertices
+
+
+
+}
+*/

@@ -97,6 +97,22 @@ where
 
         result
     }
+
+    pub fn transpose(&mut self) -> Self {
+        let mut tmp = self.array.clone();
+
+        for i in 0..N {
+            for j in 0..N {
+                tmp[i][j] = self.array[j][i];
+            }
+        }
+
+        Matrix::<CSF, CST, { N }> {
+            array: tmp,
+            _from_coordinate_space: PhantomData,
+            _to_coordinate_space: PhantomData,
+        }
+    }
 }
 
 impl<CSF, CST> Mat4<CSF, CST>

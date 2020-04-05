@@ -19,21 +19,22 @@ pub struct Any2D;
 ///       view      projection    perspective_divide  viewport_transform
 
 /// The coordinate system in which the models/triangle are position relative towards
-/// eachother and the camera.
+/// eachother and the camera. X right, Y up, Z towards screen (left-handed)
 #[derive(Copy, Clone)]
 pub struct WorldSpace;
 
 /// Similar to WorldSpace, except the origin is at the position of the camera.
-/// Also known as view space
+/// Also known as view space. Also left-handed. Things are in-front of the camera if their z is
+/// negative (in camera space)
 #[derive(Copy, Clone)]
 pub struct CameraSpace;
 
-/// This space ranges from -1, 1 and everything that is outside may be clipped
+/// This space ranges from -1, 1 for all axes and everything that is outside may be clipped
 /// Also known as projection space
 #[derive(Copy, Clone)]
 pub struct ClipSpace;
 
-/// Normalized Device Coordinates, x and y have been divided by the depth
+/// Normalized Device Coordinates, x and y have been divided by the the clip space w coordinate
 #[derive(Copy, Clone)]
 pub struct NDC;
 
@@ -83,6 +84,8 @@ pub fn project(
     let half_width = (vert_fov / 2.0).tan() * near;
     let half_height = aspect_ratio * half_width;
 
+    // Note that camera space is left-handed here, but as the frustrum is symmetric, it yields the
+    // same matrix.
     mat4(
         near / half_width,
         0.0,

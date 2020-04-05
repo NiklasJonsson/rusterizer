@@ -4,10 +4,10 @@ use minifb::{Key, Window, WindowOptions};
 
 use std::time::{Duration, Instant};
 
+mod camera;
 mod graphics_primitives;
 mod math;
 mod rasterizer;
-mod camera;
 
 use crate::graphics_primitives::*;
 use crate::rasterizer::*;
@@ -15,18 +15,24 @@ use crate::rasterizer::*;
 const WIDTH: usize = 800;
 const HEIGHT: usize = 800;
 
-fn get_centered_quad(width: f32) -> (Vec<Vertex<math::WorldSpace>>, Vec<VertexAttribute>, Vec<usize>) {
+fn get_centered_quad(
+    width: f32,
+) -> (
+    Vec<Vertex<math::WorldSpace>>,
+    Vec<VertexAttribute>,
+    Vec<usize>,
+) {
     let color = Color::blue();
     let vs = vec![
-        vertex(-width / 2.0, width / 2.0, -1.0),
-        vertex(width / 2.0, width / 2.0, -1.0),
-        vertex(width / 2.0, -width / 2.0, -2.0),
-        vertex(-width / 2.0, -width / 2.0, -2.0),
+        vertex(-width / 2.0, width / 2.0, 3.0),
+        vertex(width / 2.0, width / 2.0, 3.0),
+        vertex(width / 2.0, -width / 2.0, 3.0),
+        vertex(-width / 2.0, -width / 2.0, 3.0),
     ];
 
     let attrs = vec![color.into(); 4];
 
-    let indices = vec![0, 3, 2, 0, 2, 1];
+    let indices = vec![0, 1, 2, 0, 2, 3];
 
     (vs, attrs, indices)
 }
@@ -46,9 +52,9 @@ fn get_triangles() -> Vec<Triangle<math::WorldSpace>> {
         vertex_attributes,
     };
 
-    let pos0 = vertex(1.0, 0.0, -3.0);
-    let pos1 = vertex(2.0, 0.0, -3.0);
-    let pos2 = vertex(1.0, 1.0, -3.0);
+    let pos0 = vertex(1.0, 0.0, 3.0);
+    let pos1 = vertex(2.0, 0.0, 3.0);
+    let pos2 = vertex(1.0, 1.0, 3.0);
     let color0 = Color::red();
     let color1 = Color::green();
     let color2 = Color::green();
@@ -98,6 +104,8 @@ fn main() {
         .into_iter()
         .map(|vertex| proj_matrix * view_matrix * vertex)
         .collect::<Vec<_>>();
+
+    dbg!(&quad_vs);
 
     let draw_quad = true;
 
