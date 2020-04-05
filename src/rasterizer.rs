@@ -214,19 +214,31 @@ struct Fragment {
 }
 
 pub struct Rasterizer {
-    color_buffer: ColorBuffer,
-    depth_buffer: DepthBuffer,
+    color_buffers: [ColorBuffer; 2],
+    depth_buffers: [DepthBuffer; 2],
+    buf_idx: usize,
     width: usize,
     height: usize,
 }
 
 impl Rasterizer {
     pub fn new(width: usize, height: usize) -> Self {
+        let color_buffers = [
+            ColorBuffer::new(width, height, ColorBufferFormat::BGRA),
+            ColorBuffer::new(width, height, ColorBufferFormat::BGRA),
+        ];
+
+        let depth_buffers = [
+            DepthBuffer::new(width, height),
+            DepthBuffer::new(width, height),
+        ];
+
         Self {
             width,
             height,
-            color_buffer: ColorBuffer::new(width, height, ColorBufferFormat::BGRA),
-            depth_buffer: DepthBuffer::new(width, height),
+            buf_idx: 0,
+            color_buffers,
+            depth_buffers,
         }
     }
 
@@ -286,12 +298,12 @@ impl Rasterizer {
     }
 
     fn query_depth(&self, row: usize, col: usize) -> f32 {
-        self.depth_buffer.get_depth(row, col)
+        self.depth_buffers[self.buf_idx].get_depth(row, col)
     }
 
     fn write_pixel(&mut self, row: usize, col: usize, color: Color, depth: f32) {
-        self.color_buffer.set_pixel(row, col, color);
-        self.depth_buffer.set_depth(row, col, depth);
+        self.color_buffers[self.buf_idx].set_pixel(row, col, color);
+        self.depth_buffers[self.buf_idx].set_depth(row, col, depth);
     }
 
     fn can_cull(triangle: &Triangle<ClipSpace>) -> bool {
@@ -319,9 +331,7 @@ impl Rasterizer {
         }
     }
 
-    pub fn rasterize(&mut self, triangles: &[Triangle<ClipSpace>]) -> &ColorBuffer {
-        self.color_buffer.clear();
-        self.depth_buffer.clear();
+    pub fn rasterize(&mut self, triangles: &[Triangle<ClipSpace>]) {
         for triangle in triangles {
             if Rasterizer::can_cull(triangle) {
                 continue;
@@ -331,12 +341,10 @@ impl Rasterizer {
             let triangle = self.viewport_transform(&triangle);
             self.rasterize_triangle(&triangle);
         }
-
-        &self.color_buffer
     }
 
-    pub fn draw(&mut self, triangles: &[Triangle<ClipSpace>]) -> &ColorBuffer {
-        self.rasterize(triangles)
+    pub fn draw(&mut self, triangles: &[Triangle<ClipSpace>]) {
+        self.rasterize(triangles);
     }
 
     pub fn draw_indirect(
@@ -344,7 +352,7 @@ impl Rasterizer {
         vertex_buf: &[Vertex<ClipSpace>],
         attr_buf: &[VertexAttribute],
         idx_buf: &[usize],
-    ) -> &ColorBuffer {
+    ) {
         let mut triangles = Vec::with_capacity(idx_buf.len() / 3);
         for idxs in idx_buf.chunks(3) {
             let vertices = [
@@ -360,22 +368,14 @@ impl Rasterizer {
             });
         }
 
-        self.rasterize(&triangles)
+        self.rasterize(&triangles);
+    }
+
+    pub fn swap_buffers(&mut self) -> &ColorBuffer {
+        let prev = self.buf_idx;
+        self.buf_idx = (self.buf_idx + 1) % 2;
+        self.depth_buffers[self.buf_idx].clear();
+        self.color_buffers[self.buf_idx].clear();
+        &self.color_buffers[prev]
     }
 }
-
-/*
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn rasterize_triangle() {
-        let r = Rasterizer::new(100, 100);
-        let p0 = Point2D::new(
-        let tri = RasterizerTriangle::new(
-            vertices
-
-
-
-}
-*/

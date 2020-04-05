@@ -21,8 +21,8 @@ macro_rules! impl_accessors {
 #[derive(Copy, Clone)]
 pub struct Point<CS: CoordinateSystem, const N: usize>(Vector<CS, { N }>);
 pub type Point2D = Point<Any2D, 2>;
-pub type Point3D<CS: CoordinateSystem> = Point<CS, 3>;
-pub type Point4D<CS: CoordinateSystem> = Point<CS, 4>;
+pub type Point3D<CS> = Point<CS, 3>;
+pub type Point4D<CS> = Point<CS, 4>;
 
 impl<CS, const N: usize> Point<CS, { N }>
 where

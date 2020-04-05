@@ -26,6 +26,13 @@ impl Color {
             | ((self.a * 255.0) as u32) << 24
     }
 
+    pub fn to_argb(&self) -> u32 {
+        (self.a * 255.0) as u32
+            | ((self.r * 255.0) as u32) << 8
+            | ((self.g * 255.0) as u32) << 16
+            | ((self.b * 255.0) as u32) << 24
+    }
+
     pub fn red() -> Color {
         Color {
             r: 1.0,
@@ -103,7 +110,7 @@ impl Add for VertexAttribute {
     }
 }
 
-pub type Vertex<CS: CoordinateSystem> = Point4D<CS>;
+pub type Vertex<CS> = Point4D<CS>;
 
 pub fn vertex<CS>(x: f32, y: f32, z: f32) -> Vertex<CS>
 where
