@@ -212,18 +212,6 @@ pub fn vec4<CS: CoordinateSystem>(x: f32, y: f32, z: f32, w: f32) -> Vec4<CS> {
     }
 }
 
-// Note that this is only defined if we are using homogenous coordinates
-impl<CS: CoordinateSystem> Vec4<CS> {
-    pub fn cross(self, other: Self) -> Self {
-        let v0 = self.arr;
-        let v1 = other.arr;
-        let x = v0[1] * v1[2] - v0[2] * v1[1];
-        let y = v0[2] * v1[0] - v0[0] * v1[2];
-        let z = v0[0] * v1[1] - v0[1] * v1[0];
-        vec4(x, y, z, 1.0)
-    }
-}
-
 impl<CSF, CST, const N: usize> Mul<Vector<CSF, { N }>> for Matrix<CSF, CST, { N }>
 where
     CSF: CoordinateSystem,
