@@ -31,8 +31,8 @@ where
     impl_accessors!(x, y, z, w);
 }
 
-pub fn origin() -> Point4D<WorldSpace> {
-    Point4D::<WorldSpace>::new(0.0, 0.0, 0.0, 0.0)
+pub fn origin() -> Point3D<WorldSpace> {
+    Point3D::<WorldSpace>::new(0.0, 0.0, 0.0)
 }
 
 impl Point2D {
@@ -47,6 +47,19 @@ where
 {
     pub fn new(x: f32, y: f32, z: f32, w: f32) -> Self {
         Self(vec4::<CS>(x, y, z, w))
+    }
+}
+
+impl<CS> Point3D<CS>
+where
+    CS: CoordinateSystem,
+{
+    pub fn new(x: f32, y: f32, z: f32) -> Self {
+        Self(vec3::<CS>(x, y, z))
+    }
+
+    pub fn extend(&self, w: f32) -> Point4D<CS> {
+        Point4D::new(self.x(), self.y(), self.z(), w)
     }
 }
 

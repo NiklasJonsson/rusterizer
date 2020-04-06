@@ -110,21 +110,12 @@ impl Add for VertexAttribute {
     }
 }
 
-pub type Vertex<CS> = Point4D<CS>;
-
-pub fn vertex<CS>(x: f32, y: f32, z: f32) -> Vertex<CS>
-where
-    CS: CoordinateSystem,
-{
-    Vertex::<CS>::new(x, y, z, 1.0)
-}
-
 const N_VERTICES: usize = 3;
 pub struct Triangle<CS>
 where
     CS: CoordinateSystem,
 {
-    pub vertices: [Vertex<CS>; N_VERTICES],
+    pub vertices: [Point4D<CS>; N_VERTICES],
     pub vertex_attributes: [VertexAttribute; N_VERTICES],
 }
 

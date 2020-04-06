@@ -246,21 +246,21 @@ impl Rasterizer {
     fn perspective_divide(triangle: &Triangle<ClipSpace>) -> Triangle<NDC> {
         let old_verts = triangle.vertices;
 
-        let v0 = Vertex::<NDC>::new(
+        let v0 = Point4D::<NDC>::new(
             old_verts[0].x() / old_verts[0].w(),
             old_verts[0].y() / old_verts[0].w(),
             old_verts[0].z() / old_verts[0].w(),
             old_verts[0].w() / old_verts[0].w(),
         );
 
-        let v1 = Vertex::<NDC>::new(
+        let v1 = Point4D::<NDC>::new(
             old_verts[1].x() / old_verts[1].w(),
             old_verts[1].y() / old_verts[1].w(),
             old_verts[1].z() / old_verts[1].w(),
             old_verts[1].w() / old_verts[1].w(),
         );
 
-        let v2 = Vertex::<NDC>::new(
+        let v2 = Point4D::<NDC>::new(
             old_verts[2].x() / old_verts[2].w(),
             old_verts[2].y() / old_verts[2].w(),
             old_verts[2].z() / old_verts[2].w(),
@@ -276,7 +276,7 @@ impl Rasterizer {
 
     // Transform to screen space (RasterizerTriangle is implicitly in this space)
     fn viewport_transform(&self, tri: &Triangle<NDC>) -> RasterizerTriangle {
-        let new_vert = |vert: Vertex<NDC>| {
+        let new_vert = |vert: Point4D<NDC>| {
             let x = self.width as f32 * (vert.x() + 1.0) / 2.0;
             // Flip y as color buffer start upper left
             let y = self.height as f32 * (1.0 - (vert.y() + 1.0) / 2.0);
@@ -349,7 +349,7 @@ impl Rasterizer {
 
     pub fn draw_indirect(
         &mut self,
-        vertex_buf: &[Vertex<ClipSpace>],
+        vertex_buf: &[Point4D<ClipSpace>],
         attr_buf: &[VertexAttribute],
         idx_buf: &[usize],
     ) {

@@ -5,7 +5,7 @@ pub struct Mesh<CS>
 where
     CS: CoordinateSystem,
 {
-    pub vertices: Vec<Vertex<CS>>,
+    pub vertices: Vec<Point3D<CS>>,
     pub indices: Vec<usize>,
     pub attributes: Vec<VertexAttribute>,
 }
@@ -15,10 +15,10 @@ where
     CS: CoordinateSystem,
 {
     let vertices = vec![
-        vertex(-width / 2.0, width / 2.0, 3.0),
-        vertex(width / 2.0, width / 2.0, 3.0),
-        vertex(width / 2.0, -width / 2.0, 3.0),
-        vertex(-width / 2.0, -width / 2.0, 3.0),
+        Point3D::new(-width / 2.0, width / 2.0, 3.0),
+        Point3D::new(width / 2.0, width / 2.0, 3.0),
+        Point3D::new(width / 2.0, -width / 2.0, 3.0),
+        Point3D::new(-width / 2.0, -width / 2.0, 3.0),
     ];
 
     let attributes = vec![color.into(); 4];

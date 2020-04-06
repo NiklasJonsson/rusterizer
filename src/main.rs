@@ -33,7 +33,9 @@ fn main() {
     );
 
     let mesh = mesh::centered_quad(2.0, Color::blue());
-    let vertex_shader = |vertex: &Vertex<math::WorldSpace>| proj_matrix * view_matrix * *vertex;
+    let vertex_shader = |vertex: &math::Point3D<math::WorldSpace>| {
+        proj_matrix * view_matrix * vertex.extend(1.0)
+    };
 
     let mut meshes = Vec::new();
     meshes.push(mesh);

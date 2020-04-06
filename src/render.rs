@@ -1,4 +1,3 @@
-use crate::graphics_primitives::Vertex;
 use crate::math;
 use crate::mesh::Mesh;
 use crate::rasterizer::*;
@@ -28,9 +27,9 @@ impl Renderer {
     pub fn render(
         &mut self,
         mesh: &Mesh<math::WorldSpace>,
-        vertex_shader: impl FnMut(&Vertex<math::WorldSpace>) -> Vertex<math::ClipSpace>,
+        vertex_shader: impl FnMut(&math::Point3D<math::WorldSpace>) -> math::Point4D<math::ClipSpace>
     ) {
-        let vertices: Vec<Vertex<math::ClipSpace>> =
+        let vertices: Vec<math::Point4D<math::ClipSpace>> =
             mesh.vertices.iter().map(vertex_shader).collect::<Vec<_>>();
 
         self.rasterizer
