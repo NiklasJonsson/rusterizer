@@ -33,15 +33,20 @@ fn main() {
     );
 
     let mesh = mesh::centered_quad(2.0, Color::blue());
-    let vertex_shader =
-        |vertex: &math::Point3D<math::WorldSpace>| proj_matrix * view_matrix * vertex.extend(1.0);
 
     let mut meshes = Vec::new();
     meshes.push(mesh);
+    let start = Instant::now();
 
     loop {
         let t0 = Instant::now();
 
+        let diff = start.elapsed().as_secs_f32();
+        let world_matrix = math::transform::rotate_z::<math::WorldSpace>(diff);
+
+        let vertex_shader = |vertex: &math::Point3D<math::WorldSpace>| {
+            proj_matrix * view_matrix * world_matrix * vertex.extend(1.0)
+        };
         for mesh in &meshes {
             renderer.render(&mesh, vertex_shader);
         }
