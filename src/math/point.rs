@@ -85,6 +85,17 @@ where
     }
 }
 
+impl<CS, const N: usize> Mul<f32> for Point<CS, { N }>
+where
+    CS: CoordinateSystem,
+{
+    type Output = Point<CS, { N }>;
+
+    fn mul(self, other: f32) -> Self::Output {
+        Self(self.0 * other)
+    }
+}
+
 impl<CS, const N: usize> std::fmt::Debug for Point<CS, { N }>
 where
     CS: PrintableType + CoordinateSystem,

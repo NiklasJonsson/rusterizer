@@ -10,7 +10,6 @@ mod mesh;
 mod rasterizer;
 mod render;
 
-use crate::graphics_primitives::*;
 use crate::render::*;
 
 const WIDTH: usize = 800;
@@ -32,7 +31,7 @@ fn main() {
         std::f32::consts::FRAC_PI_2,
     );
 
-    let mesh = mesh::centered_quad(2.0, Color::blue());
+    let mesh = mesh::cube(0.5);
 
     let mut meshes = Vec::new();
     meshes.push(mesh);
@@ -42,7 +41,8 @@ fn main() {
         let t0 = Instant::now();
 
         let diff = start.elapsed().as_secs_f32();
-        let world_matrix = math::transform::rotate_z::<math::WorldSpace>(diff);
+        let world_matrix = math::transform::rotate_x::<math::WorldSpace>(diff);
+        let world_matrix = world_matrix * math::transform::rotate_y::<math::WorldSpace>(diff);
 
         let vertex_shader = |vertex: &math::Point3D<math::WorldSpace>| {
             proj_matrix * view_matrix * world_matrix * vertex.extend(1.0)

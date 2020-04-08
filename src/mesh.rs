@@ -31,3 +31,75 @@ where
         attributes,
     }
 }
+
+pub fn cube<CS>(width: f32) -> Mesh<CS>
+where
+    CS: CoordinateSystem
+{
+    let vertices = vec![
+        // Front
+        Point3D::new(-0.5, 0.5, -0.5) * width,
+        Point3D::new(0.5, 0.5, -0.5) * width,
+        Point3D::new(0.5, -0.5, -0.5) * width,
+        Point3D::new(-0.5, -0.5, -0.5) * width,
+
+        // Back
+        Point3D::new(0.5, 0.5, 0.5) * width,
+        Point3D::new(-0.5, 0.5, 0.5) * width,
+        Point3D::new(-0.5, -0.5, 0.5) * width,
+        Point3D::new(0.5, -0.5, 0.5) * width,
+
+        // Left
+        Point3D::new(-0.5, 0.5, 0.5) * width,
+        Point3D::new(-0.5, 0.5, -0.5) * width,
+        Point3D::new(-0.5, -0.5, -0.5) * width,
+        Point3D::new(-0.5, -0.5, 0.5) * width,
+
+        // Right
+        Point3D::new(0.5, 0.5, -0.5) * width,
+        Point3D::new(0.5, 0.5, 0.5) * width,
+        Point3D::new(0.5, -0.5, 0.5) * width,
+        Point3D::new(0.5, -0.5, -0.5) * width,
+
+        // Top
+        Point3D::new(-0.5, 0.5, -0.5) * width,
+        Point3D::new(-0.5, 0.5, 0.5) * width,
+        Point3D::new(0.5, 0.5, 0.5) * width,
+        Point3D::new(0.5, 0.5, -0.5) * width,
+
+        // Bottom
+        Point3D::new(-0.5, -0.5, 0.5) * width,
+        Point3D::new(-0.5, -0.5, -0.5) * width,
+        Point3D::new(0.5, -0.5, -0.5) * width,
+        Point3D::new(0.5, -0.5, 0.5) * width,
+    ];
+
+    let mut indices = Vec::new();
+    for i in 0..6 {
+        let offset = i * 4;
+        let mut add_triangle = |i: usize, j: usize, k: usize| {
+            indices.push(offset + i);
+            indices.push(offset + j);
+            indices.push(offset + k);
+        };
+        add_triangle(0, 1, 2);
+        add_triangle(0, 2, 3);
+    }
+
+    let mut attributes = Vec::new();
+    for i in 0..vertices.len() {
+        attributes.push(
+            match i % 3 {
+            0 => Color::red().into(),
+            1 => Color::blue().into(),
+            _ => Color::green().into(),
+            }
+        );
+    }
+
+    Mesh::<CS> {
+        vertices,
+        indices,
+        attributes,
+    }
+}
