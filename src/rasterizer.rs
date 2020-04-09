@@ -310,7 +310,8 @@ impl Rasterizer {
         return triangle.vertices.iter().all(|x| x.w() <= 0.0);
     }
 
-    fn rasterize_triangle(&mut self, triangle: &RasterizerTriangle) {
+    fn rasterize_triangle(&mut self, triangle: &RasterizerTriangle,
+                          fragment_shader: fn(&VertexAttribute) -> Color) {
         let bounding_box = PixelBoundingBox::from(&triangle.vertices);
         for i in bounding_box.min_y..bounding_box.max_y {
             for j in bounding_box.min_x..bounding_box.max_x {
@@ -324,14 +325,15 @@ impl Rasterizer {
                         continue;
                     }
 
-                    let col = fragment.attribute.color;
+                    let col = fragment_shader(&fragment.attribute);
                     self.write_pixel(i, j, col, fragment.depth);
                 }
             }
         }
     }
 
-    pub fn rasterize(&mut self, triangles: &[Triangle<ClipSpace>]) {
+    pub fn rasterize(&mut self, triangles: &[Triangle<ClipSpace>],
+                     fragment_shader: fn(&VertexAttribute) -> Color) {
         for triangle in triangles {
             if Rasterizer::can_cull(triangle) {
                 continue;
@@ -339,36 +341,8 @@ impl Rasterizer {
 
             let triangle = Rasterizer::perspective_divide(triangle);
             let triangle = self.viewport_transform(&triangle);
-            self.rasterize_triangle(&triangle);
+            self.rasterize_triangle(&triangle, fragment_shader);
         }
-    }
-
-    pub fn draw(&mut self, triangles: &[Triangle<ClipSpace>]) {
-        self.rasterize(triangles);
-    }
-
-    pub fn draw_indirect(
-        &mut self,
-        vertex_buf: &[Point4D<ClipSpace>],
-        attr_buf: &[VertexAttribute],
-        idx_buf: &[usize],
-    ) {
-        let mut triangles = Vec::with_capacity(idx_buf.len() / 3);
-        for idxs in idx_buf.chunks(3) {
-            let vertices = [
-                vertex_buf[idxs[0]],
-                vertex_buf[idxs[1]],
-                vertex_buf[idxs[2]],
-            ];
-            let vertex_attributes = [attr_buf[idxs[0]], attr_buf[idxs[1]], attr_buf[idxs[2]]];
-
-            triangles.push(Triangle {
-                vertices,
-                vertex_attributes,
-            });
-        }
-
-        self.rasterize(&triangles);
     }
 
     pub fn swap_buffers(&mut self) -> &ColorBuffer {

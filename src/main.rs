@@ -11,6 +11,7 @@ mod rasterizer;
 mod render;
 
 use crate::render::*;
+use crate::graphics_primitives::VertexAttribute;
 
 const WIDTH: usize = 800;
 const HEIGHT: usize = 800;
@@ -44,11 +45,14 @@ fn main() {
         let world_matrix = math::transform::rotate_x::<math::WorldSpace>(diff);
         let world_matrix = world_matrix * math::transform::rotate_y::<math::WorldSpace>(diff);
 
-        let vertex_shader = |vertex: &math::Point3D<math::WorldSpace>| {
+        let vertex_shader = move |vertex: &math::Point3D<math::WorldSpace>| {
             proj_matrix * view_matrix * world_matrix * vertex.extend(1.0)
         };
+
+        let fragment_shader = |attr: &VertexAttribute| attr.color;
+
         for mesh in &meshes {
-            renderer.render(&mesh, vertex_shader);
+            renderer.render(&mesh, vertex_shader, fragment_shader);
         }
 
         avg = (avg * iterations + t0.elapsed()) / (iterations + 1);
