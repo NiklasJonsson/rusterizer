@@ -2,96 +2,17 @@ use core::ops::Add;
 use core::ops::Mul;
 
 use crate::math::*;
-
-#[derive(Debug, Copy, Clone, Default)]
-pub struct Color {
-    pub r: f32,
-    pub g: f32,
-    pub b: f32,
-    pub a: f32,
-}
-
-impl Color {
-    pub fn to_rgba(&self) -> u32 {
-        (self.r * 255.0) as u32
-            | ((self.g * 255.0) as u32) << 8
-            | ((self.b * 255.0) as u32) << 16
-            | ((self.a * 255.0) as u32) << 24
-    }
-
-    pub fn to_bgra(&self) -> u32 {
-        (self.b * 255.0) as u32
-            | ((self.g * 255.0) as u32) << 8
-            | ((self.r * 255.0) as u32) << 16
-            | ((self.a * 255.0) as u32) << 24
-    }
-
-    pub fn to_argb(&self) -> u32 {
-        (self.a * 255.0) as u32
-            | ((self.r * 255.0) as u32) << 8
-            | ((self.g * 255.0) as u32) << 16
-            | ((self.b * 255.0) as u32) << 24
-    }
-
-    pub fn red() -> Color {
-        Color {
-            r: 1.0,
-            g: 0.0,
-            b: 0.0,
-            a: 1.0,
-        }
-    }
-    pub fn green() -> Color {
-        Color {
-            r: 0.0,
-            g: 1.0,
-            b: 0.0,
-            a: 1.0,
-        }
-    }
-    pub fn blue() -> Color {
-        Color {
-            r: 0.0,
-            g: 0.0,
-            b: 1.0,
-            a: 1.0,
-        }
-    }
-}
-
-impl Mul<f32> for Color {
-    type Output = Color;
-
-    fn mul(self, scalar: f32) -> Color {
-        Color {
-            r: self.r * scalar,
-            g: self.g * scalar,
-            b: self.b * scalar,
-            a: self.a * scalar,
-        }
-    }
-}
-
-impl Add<Color> for Color {
-    type Output = Color;
-    fn add(self, other: Color) -> Color {
-        Color {
-            r: self.r + other.r,
-            g: self.g + other.g,
-            b: self.b + other.b,
-            a: self.a + other.a,
-        }
-    }
-}
+use crate::color::Color;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct VertexAttribute {
     pub color: Color,
+    pub uvs: [f32; 2],
 }
 
-impl From<Color> for VertexAttribute {
-    fn from(other: Color) -> VertexAttribute {
-        VertexAttribute { color: other }
+impl From<(Color, [f32; 2])> for VertexAttribute {
+    fn from((color, uvs): (Color, [f32; 2])) -> Self {
+        VertexAttribute{ color, uvs }
     }
 }
 
@@ -99,14 +20,26 @@ impl Mul<f32> for VertexAttribute {
     type Output = Self;
 
     fn mul(self, scalar: f32) -> Self::Output {
-        (self.color * scalar).into()
+        let color = self.color * scalar;
+        let uvs = [self.uvs[0] * scalar, self.uvs[1] * scalar];
+
+        Self {
+            color,
+            uvs
+        }
     }
 }
 
 impl Add for VertexAttribute {
     type Output = Self;
     fn add(self, other: VertexAttribute) -> Self::Output {
-        (self.color + other.color).into()
+        let color = self.color + other.color;
+        let uvs = [self.uvs[0] + other.uvs[0], self.uvs[1] + other.uvs[1]]; 
+
+        Self {
+            color,
+            uvs
+        }
     }
 }
 

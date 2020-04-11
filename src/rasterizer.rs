@@ -1,5 +1,7 @@
 use crate::graphics_primitives::*;
+use crate::color::Color;
 use crate::math::*;
+use crate::uniform::*;
 
 use core::ops::{Add, Mul};
 
@@ -65,19 +67,24 @@ impl ColorBuffer {
         for _i in 0..width * height {
             buffer.push(0);
         }
-        Self {
+        let mut ret = Self {
             buffer,
             width,
             height,
             format,
-        }
+        };
+
+        ret.clear();
+        ret
     }
 
-    // Clear to black
+    // Clear to dark grey
     fn clear(&mut self) {
         assert_eq!(self.buffer.len(), self.height * self.width);
-        for i in 0..self.width * self.height {
-            self.buffer[i] = 0;
+        for i in 0..self.width {
+            for j in 0..self.height {
+                self.set_pixel(i, j, Color{r: 0.1, g: 0.1, b: 0.1, a: 1.0});
+            }
         }
     }
 
@@ -310,8 +317,12 @@ impl Rasterizer {
         return triangle.vertices.iter().all(|x| x.w() <= 0.0);
     }
 
-    fn rasterize_triangle(&mut self, triangle: &RasterizerTriangle,
-                          fragment_shader: fn(&VertexAttribute) -> Color) {
+    fn rasterize_triangle<FragmentShader>(&mut self, triangle: &RasterizerTriangle,
+                          uniforms: &Uniforms,
+                          fragment_shader: FragmentShader)
+        where
+            FragmentShader: Fn(&Uniforms, &VertexAttribute) -> Color
+    {
         let bounding_box = PixelBoundingBox::from(&triangle.vertices);
         for i in bounding_box.min_y..bounding_box.max_y {
             for j in bounding_box.min_x..bounding_box.max_x {
@@ -325,15 +336,20 @@ impl Rasterizer {
                         continue;
                     }
 
-                    let col = fragment_shader(&fragment.attribute);
+                    let col = fragment_shader(uniforms, &fragment.attribute);
                     self.write_pixel(i, j, col, fragment.depth);
                 }
             }
         }
     }
 
-    pub fn rasterize(&mut self, triangles: &[Triangle<ClipSpace>],
-                     fragment_shader: fn(&VertexAttribute) -> Color) {
+
+    pub fn rasterize<FragmentShader>(&mut self, triangles: &[Triangle<ClipSpace>],
+                                     uniforms: &Uniforms,
+                     fragment_shader: FragmentShader)
+        where
+            FragmentShader: Fn(&Uniforms, &VertexAttribute) -> Color + Copy
+    {
         for triangle in triangles {
             if Rasterizer::can_cull(triangle) {
                 continue;
@@ -341,7 +357,7 @@ impl Rasterizer {
 
             let triangle = Rasterizer::perspective_divide(triangle);
             let triangle = self.viewport_transform(&triangle);
-            self.rasterize_triangle(&triangle, fragment_shader);
+            self.rasterize_triangle(&triangle, uniforms, fragment_shader);
         }
     }
 

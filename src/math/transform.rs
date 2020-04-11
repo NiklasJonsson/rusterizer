@@ -95,3 +95,10 @@ where
         1.0,
     )
 }
+
+pub fn rotate<CS>(x: f32, y: f32, z: f32) -> Mat4<CS, CS>
+where
+    CS: CoordinateSystem,
+{
+    rotate_z(z) * rotate_y(y) * rotate_x(x)
+}

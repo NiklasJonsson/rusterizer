@@ -9,9 +9,13 @@ mod math;
 mod mesh;
 mod rasterizer;
 mod render;
+mod color;
+mod texture;
+mod uniform;
 
 use crate::render::*;
 use crate::graphics_primitives::VertexAttribute;
+use crate::uniform::Uniforms;
 
 const WIDTH: usize = 800;
 const HEIGHT: usize = 800;
@@ -32,24 +36,26 @@ fn main() {
         std::f32::consts::FRAC_PI_2,
     );
 
-    let mesh = mesh::cube(0.5);
+    let mesh = mesh::centered_quad(1.0);
 
     let mut meshes = Vec::new();
     meshes.push(mesh);
     let start = Instant::now();
 
+    let tex = texture::Texture::from_png_file("images/checkerboard.png");
+
+    let checkerboard_handle = renderer.bind_texture(tex);
+
     loop {
         let t0 = Instant::now();
 
         let diff = start.elapsed().as_secs_f32();
-        let world_matrix = math::transform::rotate_x::<math::WorldSpace>(diff);
-        let world_matrix = world_matrix * math::transform::rotate_y::<math::WorldSpace>(diff);
-
+        let world_matrix = math::transform::rotate::<math::WorldSpace>(diff, diff, 0.0);
         let vertex_shader = move |vertex: &math::Point3D<math::WorldSpace>| {
-            proj_matrix * view_matrix * world_matrix * vertex.extend(1.0)
+            proj_matrix * view_matrix * vertex.extend(1.0)
         };
 
-        let fragment_shader = |attr: &VertexAttribute| attr.color;
+        let fragment_shader = move |uniforms: &Uniforms, attr: &VertexAttribute| uniforms.get_texture(checkerboard_handle).sample(attr.uvs[0], attr.uvs[1]);
 
         for mesh in &meshes {
             renderer.render(&mesh, vertex_shader, fragment_shader);
@@ -67,7 +73,8 @@ fn main() {
                 println!("{}", e);
                 return;
             }
-            _ => (),
+            Ok(false) => return,
+            Ok(true) => (),
         }
     }
 }

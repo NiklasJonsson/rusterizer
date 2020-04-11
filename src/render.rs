@@ -2,10 +2,14 @@ use crate::math;
 use crate::mesh::Mesh;
 use crate::rasterizer::*;
 use crate::graphics_primitives::*;
+use crate::color::Color;
+use crate::uniform::{Uniforms, UniformHandle};
+use crate::texture::Texture;
 
 pub struct Renderer {
     rasterizer: Rasterizer,
     window: minifb::Window,
+    uniforms: Uniforms,
 }
 
 impl Renderer {
@@ -22,7 +26,11 @@ impl Renderer {
 
         let rasterizer = Rasterizer::new(width, height);
 
-        Self { rasterizer, window }
+        Self { rasterizer, window, uniforms: Uniforms::new() }
+    }
+
+    pub fn bind_texture(&mut self, tex: Texture) -> UniformHandle {
+        self.uniforms.bind_texture(tex)
     }
 
     fn primitive_assembly(
@@ -49,32 +57,32 @@ impl Renderer {
 
     }
 
-    pub fn render(
+    pub fn render<FragmentShader>(
         &mut self,
         mesh: &Mesh<math::WorldSpace>,
         vertex_shader: impl Fn(&math::Point3D<math::WorldSpace>) -> math::Point4D<math::ClipSpace>,
-        fragment_shader: fn(&VertexAttribute) -> Color,
-    ) {
+        fragment_shader: FragmentShader,
+    )
+        where FragmentShader: Fn(&Uniforms, &VertexAttribute) -> Color + Copy
+    {
         let vertices: Vec<math::Point4D<math::ClipSpace>> =
             mesh.vertices.iter().map(vertex_shader).collect::<Vec<_>>();
 
         let tris = Renderer::primitive_assembly(&vertices, &mesh.attributes, &mesh.indices);
 
         self.rasterizer
-            .rasterize(&tris, fragment_shader);
+            .rasterize(&tris, &self.uniforms, fragment_shader);
     }
 
-    pub fn display(&mut self) -> minifb::Result<()> {
+    pub fn display(&mut self) -> minifb::Result<bool> {
         if !self.window.is_open() || self.window.is_key_down(minifb::Key::Escape) {
-            return Err(minifb::Error::UpdateFailed(
-                "Either not open or ESC is pressed!".to_string(),
-            ));
+            return Ok(false);
         }
 
         let color_buffer = self.rasterizer.swap_buffers();
 
         self.window.update_with_buffer(color_buffer.get_raw())?;
 
-        Ok(())
+        Ok(true)
     }
 }
