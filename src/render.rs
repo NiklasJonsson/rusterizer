@@ -1,10 +1,10 @@
+use crate::color::Color;
+use crate::graphics_primitives::*;
 use crate::math;
 use crate::mesh::Mesh;
 use crate::rasterizer::*;
-use crate::graphics_primitives::*;
-use crate::color::Color;
-use crate::uniform::{Uniforms, UniformHandle};
 use crate::texture::Texture;
+use crate::uniform::{UniformHandle, Uniforms};
 
 pub struct Renderer {
     rasterizer: Rasterizer,
@@ -26,7 +26,11 @@ impl Renderer {
 
         let rasterizer = Rasterizer::new(width, height);
 
-        Self { rasterizer, window, uniforms: Uniforms::new() }
+        Self {
+            rasterizer,
+            window,
+            uniforms: Uniforms::new(),
+        }
     }
 
     pub fn bind_texture(&mut self, tex: Texture) -> UniformHandle {
@@ -37,7 +41,7 @@ impl Renderer {
         vertex_buf: &[math::Point4D<math::ClipSpace>],
         attr_buf: &[VertexAttribute],
         idx_buf: &[usize],
-        ) -> Vec<Triangle<math::ClipSpace>> {
+    ) -> Vec<Triangle<math::ClipSpace>> {
         let mut triangles = Vec::with_capacity(idx_buf.len() / 3);
         for idxs in idx_buf.chunks(3) {
             let vertices = [
@@ -54,7 +58,6 @@ impl Renderer {
         }
 
         triangles
-
     }
 
     pub fn render<FragmentShader>(
@@ -62,8 +65,8 @@ impl Renderer {
         mesh: &Mesh<math::WorldSpace>,
         vertex_shader: impl Fn(&math::Point3D<math::WorldSpace>) -> math::Point4D<math::ClipSpace>,
         fragment_shader: FragmentShader,
-    )
-        where FragmentShader: Fn(&Uniforms, &VertexAttribute) -> Color + Copy
+    ) where
+        FragmentShader: Fn(&Uniforms, &FragCoords, &VertexAttribute) -> Color + Copy,
     {
         let vertices: Vec<math::Point4D<math::ClipSpace>> =
             mesh.vertices.iter().map(vertex_shader).collect::<Vec<_>>();

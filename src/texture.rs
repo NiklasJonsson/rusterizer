@@ -1,4 +1,4 @@
-use std::fs::{File};
+use std::fs::File;
 use std::path::Path;
 
 use crate::color::Color;
@@ -15,7 +15,7 @@ impl Texture {
         let file = File::open(path).expect("Failed to read file");
         let decoder = png::Decoder::new(file);
         let (info, mut reader) = decoder.read_info().expect("Failed to read info");
-        dbg!(&info);
+        assert!(!reader.info().interlaced);
         // Allocate the output buffer.
         let mut buf = Vec::with_capacity(info.buffer_size());
         buf.resize(info.buffer_size(), 0);
@@ -25,7 +25,7 @@ impl Texture {
         assert_eq!(info.color_type, png::ColorType::RGBA);
         assert_eq!(info.bit_depth, png::BitDepth::Eight);
 
-        Texture { 
+        Texture {
             buf,
             width: info.width as usize,
             height: info.height as usize,
@@ -35,27 +35,27 @@ impl Texture {
 
     pub fn read_texel(&self, x: usize, y: usize) -> Color {
         assert!(self.texel_width == 3 || self.texel_width == 4);
+        assert!(x < self.width, "x: {}", x);
+        assert!(y < self.height, "y: {}", y);
         let texel_start = x * self.texel_width + y * self.texel_width * self.width;
-        let mut rgba: [u8; 4] = 
-            [self.buf[texel_start],
+        let mut rgba: [u8; 4] = [
+            self.buf[texel_start],
             self.buf[texel_start + 1],
             self.buf[texel_start + 2],
             255,
-            ];
+        ];
         if self.texel_width == 4 {
             rgba[3] = self.buf[texel_start + 3];
         }
 
         Color::from_rgba(rgba)
-
     }
 
-
-    pub fn sample(&self, u: f32, v: f32) -> Color
-    {
-        assert!(u >= 0.0 && u <= 1.0, "Incorrect u coordinate!");
-        assert!(v >= 0.0 && v <= 1.0, "Incorrect v coordinate!");
-        self.read_texel((u * self.width as f32) as usize, (v * self.height as f32) as usize)
+    pub fn sample(&self, u: f32, v: f32) -> Color {
+        assert!(u >= 0.0 && u <= 1.0, "Inncorrect u coordinate: {}", u);
+        assert!(v >= 0.0 && v <= 1.0, "Inncorrect v coordinate: {}", v);
+        let x = (u * (self.width - 1) as f32) + 0.5;
+        let y = (v * (self.height - 1) as f32) + 0.5;
+        self.read_texel(x as usize, y as usize)
     }
-
 }

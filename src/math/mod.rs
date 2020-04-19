@@ -39,6 +39,8 @@ pub struct ClipSpace;
 pub struct NDC;
 
 /// x: [0..screen_width] and y: [0..screen_height]
+/// z: [zmin, zmax] as defined by the rasterizer
+/// Note that (0, 0) is the upper left corner
 #[derive(Copy, Clone)]
 pub struct ScreenSpace;
 
@@ -81,6 +83,7 @@ pub fn project(
     aspect_ratio: f32,
     vert_fov: f32,
 ) -> Mat4<CameraSpace, ClipSpace> {
+    assert!(near > 0.0);
     let half_width = (vert_fov / 2.0).tan() * near;
     let half_height = aspect_ratio * half_width;
 

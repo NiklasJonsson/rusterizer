@@ -1,4 +1,5 @@
 use core::ops::Add;
+use core::ops::Div;
 use core::ops::Mul;
 
 #[derive(Debug, Copy, Clone, Default)]
@@ -51,7 +52,6 @@ impl Color {
         }
     }
 
-
     pub fn red() -> Self {
         Color {
             r: 1.0,
@@ -85,6 +85,15 @@ impl Color {
             a: 1.0,
         }
     }
+
+    pub fn grayscale(v: f32) -> Self {
+        Color {
+            r: v,
+            g: v,
+            b: v,
+            a: 1.0,
+        }
+    }
 }
 
 impl Mul<f32> for Color {
@@ -96,6 +105,19 @@ impl Mul<f32> for Color {
             g: self.g * scalar,
             b: self.b * scalar,
             a: self.a * scalar,
+        }
+    }
+}
+
+impl Div<f32> for Color {
+    type Output = Color;
+
+    fn div(self, scalar: f32) -> Color {
+        Color {
+            r: self.r / scalar,
+            g: self.g / scalar,
+            b: self.b / scalar,
+            a: self.a / scalar,
         }
     }
 }

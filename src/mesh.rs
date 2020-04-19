@@ -1,5 +1,5 @@
-use crate::graphics_primitives::*;
 use crate::color::Color;
+use crate::graphics_primitives::*;
 use crate::math::*;
 
 pub struct Mesh<CS>
@@ -16,21 +16,45 @@ where
     CS: CoordinateSystem,
 {
     let vertices = vec![
-        Point3D::new(-width / 2.0, width / 2.0, 0.0),
-        Point3D::new(width / 2.0, width / 2.0, 0.0),
-        Point3D::new(width / 2.0, -width / 2.0, 0.0),
-        Point3D::new(-width / 2.0, -width / 2.0, 0.0),
+        Point3D::new(-width / 2.0, width / 2.0, 2.0),
+        Point3D::new(width / 2.0, width / 2.0, 2.0),
+        Point3D::new(width / 2.0, -width / 2.0, 10.0),
+        Point3D::new(-width / 2.0, -width / 2.0, 10.0),
+    ];
+
+    let attributes = vec![
+        (Color::red(), [0.0, 0.0]).into(),
+        (Color::blue(), [1.0, 0.0]).into(),
+        (Color::green(), [1.0, 1.0]).into(),
+        (Color::white(), [0.0, 1.0]).into(),
+    ];
+
+    let indices = vec![0, 1, 2, 0, 2, 3];
+
+    Mesh::<CS> {
+        vertices,
+        indices,
+        attributes,
+    }
+}
+
+pub fn triangle<CS>() -> Mesh<CS>
+where
+    CS: CoordinateSystem,
+{
+    let vertices = vec![
+        Point3D::new(-1.0, -2.0, 3.0),
+        Point3D::new(0.0, 1.0, 30.0),
+        Point3D::new(1.0, -2.0, 2.0),
     ];
 
     let attributes = vec![
         (Color::red(), [0.0, 1.0]).into(),
-        (Color::blue(), [1.0, 1.0]).into(),
-        (Color::green(), [1.0, 0.0]).into(),
-        (Color::white(), [0.0, 0.0]).into(),
-        ];
+        (Color::blue(), [1.0, 0.0]).into(),
+        (Color::green(), [1.0, 1.0]).into(),
+    ];
 
-    let indices = vec![0, 1, 2, 0, 2, 3];
-
+    let indices = vec![0, 1, 2];
     Mesh::<CS> {
         vertices,
         indices,

@@ -61,6 +61,10 @@ where
     pub fn extend(&self, w: f32) -> Point4D<CS> {
         Point4D::new(self.x(), self.y(), self.z(), w)
     }
+
+    pub fn xy(&self) -> Point2D {
+        Point2D::new(self.x(), self.y())
+    }
 }
 
 impl<CS, const N: usize> Sub for Point<CS, { N }>

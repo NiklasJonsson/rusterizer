@@ -1,8 +1,9 @@
 use core::ops::Add;
+use core::ops::Div;
 use core::ops::Mul;
 
-use crate::math::*;
 use crate::color::Color;
+use crate::math::*;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct VertexAttribute {
@@ -12,7 +13,7 @@ pub struct VertexAttribute {
 
 impl From<(Color, [f32; 2])> for VertexAttribute {
     fn from((color, uvs): (Color, [f32; 2])) -> Self {
-        VertexAttribute{ color, uvs }
+        VertexAttribute { color, uvs }
     }
 }
 
@@ -23,10 +24,18 @@ impl Mul<f32> for VertexAttribute {
         let color = self.color * scalar;
         let uvs = [self.uvs[0] * scalar, self.uvs[1] * scalar];
 
-        Self {
-            color,
-            uvs
-        }
+        Self { color, uvs }
+    }
+}
+
+impl Div<f32> for VertexAttribute {
+    type Output = Self;
+
+    fn div(self, scalar: f32) -> Self::Output {
+        let color = self.color / scalar;
+        let uvs = [self.uvs[0] / scalar, self.uvs[1] / scalar];
+
+        Self { color, uvs }
     }
 }
 
@@ -34,12 +43,9 @@ impl Add for VertexAttribute {
     type Output = Self;
     fn add(self, other: VertexAttribute) -> Self::Output {
         let color = self.color + other.color;
-        let uvs = [self.uvs[0] + other.uvs[0], self.uvs[1] + other.uvs[1]]; 
+        let uvs = [self.uvs[0] + other.uvs[0], self.uvs[1] + other.uvs[1]];
 
-        Self {
-            color,
-            uvs
-        }
+        Self { color, uvs }
     }
 }
 
