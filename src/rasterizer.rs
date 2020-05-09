@@ -13,8 +13,8 @@ struct PixelBoundingBox {
     pub max_y: usize,
 }
 
-impl From<&[Point3D<ScreenSpace>; 3]> for PixelBoundingBox {
-    fn from(vertices: &[Point3D<ScreenSpace>; 3]) -> Self {
+impl From<&[Point2D; 3]> for PixelBoundingBox {
+    fn from(vertices: &[Point2D; 3]) -> Self {
         let vals = vertices
             .iter()
             .fold((f32::MAX, f32::MIN, f32::MAX, f32::MIN), |a, p| {
@@ -167,13 +167,55 @@ fn verify_barys(a: f32, b: f32, c: f32) {
     assert!(a + b + c <= 1.0 + eps && a + b + c >= 0.0 - eps);
 }
 
+#[derive(Debug, Clone)]
+struct EdgeFunctions {
+    points: [Point2D; 3],
+    normals: [Vec2; 3],
+    evaluated: [f32; 3],
+}
+
+impl EdgeFunctions {
+    fn eval(&mut self, x: f32, y: f32) {
+        let p = Point2D::new(x, y);
+        self.evaluated = [
+            self.normals[0].dot(p - self.points[0]),
+            self.normals[1].dot(p - self.points[1]),
+            self.normals[2].dot(p - self.points[2]),
+        ];
+    }
+
+    fn inside(&self) -> bool {
+        self.evaluated
+            .iter()
+            .zip(self.normals.iter())
+            .all(|(val, normal)| {
+                if *val > 0.0 {
+                    return true;
+                }
+                if *val < 0.0 {
+                    return false;
+                }
+                if normal.x() > 0.0 {
+                    return true;
+                }
+                if normal.x() < 0.0 {
+                    return false;
+                }
+                if normal.y() < 0.0 {
+                    return true;
+                }
+                return false;
+            })
+    }
+}
+
 // Implicitly in 2D Screen space
 #[derive(Debug, Clone)]
 struct RasterizerTriangle {
-    vertices: [Point3D<ScreenSpace>; 3],
+    edge_functions: EdgeFunctions,
     depths_camera_space: [f32; 3],
+    depths_ndc: [f32; 3],
     attributes: [VertexAttribute; 3],
-    line_normals: [Vec2; 3],
     inv_area: f32,
 }
 
@@ -203,25 +245,32 @@ impl RasterizerTriangle {
         let v20 = vertices[2].xy() - vertices[0].xy();
         let inv_area = 1.0 / v10.cross(v20);
 
+        let edge_functions = EdgeFunctions {
+            points: [vertices[0].xy(), vertices[1].xy(), vertices[2].xy()],
+            normals: [n0, n1, n2],
+            evaluated: [0.0, 0.0, 0.0],
+        };
+
         Self {
-            vertices,
+            edge_functions,
             depths_camera_space,
+            depths_ndc: [vertices[0].z(), vertices[1].z(), vertices[2].z()],
             attributes,
-            line_normals,
             inv_area,
         }
     }
 
-    pub fn edge_functions(&self, point: Point2D) -> [f32; 3] {
-        [
-            self.line_normals[0].dot(point - self.vertices[0].xy()),
-            self.line_normals[1].dot(point - self.vertices[1].xy()),
-            self.line_normals[2].dot(point - self.vertices[2].xy()),
-        ]
+    fn eval_edge_functions(&mut self, x: f32, y: f32) {
+        self.edge_functions.eval(x, y);
+    }
+
+    fn inside(&self) -> bool {
+        self.edge_functions.inside()
     }
 
     // See realtime rendering on details
-    fn fragment_with<'a>(&'a self, edge_functions: &[f32; 3]) -> Fragment<'a> {
+    fn fragment<'a>(&'a self) -> Fragment<'a> {
+        let edge_functions = &self.edge_functions.evaluated;
         // Linear barycentrics, used only for interpolating z
         let bary0 = edge_functions[1] * self.inv_area;
         let bary1 = edge_functions[2] * self.inv_area;
@@ -231,9 +280,8 @@ impl RasterizerTriangle {
         // z here is in NDC and in that transform it was divided by w (camera space depth) which
         // means we can interpolate it with the linear barycentrics. For attributes, we need
         // perspective correct barycentrics;
-        let depth = bary0 * self.vertices[0].z()
-            + bary1 * self.vertices[1].z()
-            + bary2 * self.vertices[2].z();
+        let depth =
+            bary0 * self.depths_ndc[0] + bary1 * self.depths_ndc[1] + bary2 * self.depths_ndc[2];
 
         // Perspective correct barycentrics.
         // TODO: These should be moved to after the depth test
@@ -324,7 +372,7 @@ impl Rasterizer {
         }
     }
 
-    fn viewport_transform(&self, tri: &Triangle<NDC>) -> RasterizerTriangle {
+    fn viewport_transform(&self, tri: Triangle<NDC>) -> RasterizerTriangle {
         let zmin = 0.0;
         let zmax = 1.0;
         let new_vert = |vert: Point4D<NDC>| {
@@ -369,40 +417,6 @@ impl Rasterizer {
         return triangle.vertices.iter().all(|x| x.w() <= 0.0);
     }
 
-    fn rasterize_triangle<FS>(
-        &mut self,
-        triangle: &RasterizerTriangle,
-        uniforms: &Uniforms,
-        fragment_shader: FS,
-    ) where
-        FS: Fn(&Uniforms, &FragCoords, &VertexAttribute) -> Color + Copy,
-    {
-        let bounding_box = PixelBoundingBox::from(&triangle.vertices);
-        for i in bounding_box.min_y..bounding_box.max_y {
-            for j in bounding_box.min_x..bounding_box.max_x {
-                // Sample middle of pixel
-                let x = j as f32 + 0.5;
-                let y = i as f32 + 0.5;
-                let edge_functions = triangle.edge_functions(Point2D::new(x, y));
-                if edge_functions.iter().all(|&x| x > 0.0) {
-                    let fragment = triangle.fragment_with(&edge_functions);
-                    if self.query_depth(i, j) < fragment.depth {
-                        continue;
-                    }
-
-                    let fc = FragCoords {
-                        x,
-                        y,
-                        depth: fragment.depth,
-                    };
-
-                    let col = fragment_shader(uniforms, &fc, &fragment.interpolate());
-                    self.write_pixel(i, j, col, fragment.depth);
-                }
-            }
-        }
-    }
-
     pub fn rasterize<FS>(
         &mut self,
         triangles: &[Triangle<ClipSpace>],
@@ -417,8 +431,31 @@ impl Rasterizer {
             }
 
             let triangle = Rasterizer::perspective_divide(triangle);
-            let triangle = self.viewport_transform(&triangle);
-            self.rasterize_triangle(&triangle, uniforms, fragment_shader);
+            let mut triangle = self.viewport_transform(triangle);
+            let bounding_box = PixelBoundingBox::from(&triangle.edge_functions.points);
+            for i in bounding_box.min_y..bounding_box.max_y {
+                for j in bounding_box.min_x..bounding_box.max_x {
+                    // Sample middle of pixel
+                    let x = j as f32 + 0.5;
+                    let y = i as f32 + 0.5;
+                    triangle.eval_edge_functions(x, y);
+                    if triangle.inside() {
+                        let fragment = triangle.fragment();
+                        if self.query_depth(i, j) < fragment.depth {
+                            continue;
+                        }
+
+                        let fc = FragCoords {
+                            x,
+                            y,
+                            depth: fragment.depth,
+                        };
+
+                        let col = fragment_shader(uniforms, &fc, &fragment.interpolate());
+                        self.write_pixel(i, j, col, fragment.depth);
+                    }
+                }
+            }
         }
     }
 

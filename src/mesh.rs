@@ -44,7 +44,7 @@ where
 {
     let vertices = vec![
         Point3D::new(-1.0, -1.0, 2.0),
-        Point3D::new(0.0, 1.0, 20.0),
+        Point3D::new(0.0, 1.0, 2.0),
         Point3D::new(1.0, -1.0, 2.0),
     ];
 
