@@ -45,7 +45,7 @@ impl Camera {
 
 impl Default for Camera {
     fn default() -> Camera {
-        let pos = Point3D::<WorldSpace>::new(0.0, 0.0, -2.0);
+        let pos = Point3D::<WorldSpace>::new(0.0, 0.0, -5.0);
         let up = vec3::<WorldSpace>(0.0, 1.0, 0.0).normalize();
         let dir = vec3::<WorldSpace>(0.0, 0.0, 1.0).normalize();
 

@@ -62,7 +62,6 @@ where
     }
 }
 
-/*
 pub fn cube<CS>(width: f32) -> Mesh<CS>
 where
     CS: CoordinateSystem
@@ -117,16 +116,31 @@ where
         add_triangle(0, 2, 3);
     }
 
-    let mut attributes = Vec::new();
+    let mut colors = Vec::new();
     for i in 0..vertices.len() {
-        attributes.push(
+        colors.push(
             match i % 3 {
-            0 => Color::red().into(),
-            1 => Color::blue().into(),
-            _ => Color::green().into(),
-            }
+            0 => Color::red(),
+            1 => Color::blue(),
+            _ => Color::green(),
+            },
         );
     }
+
+    let mut tex_coords = Vec::with_capacity(vertices.len());
+    assert_eq!(vertices.len() % 4, 0);
+    for _ in 0..vertices.len() / 4 {
+        tex_coords.push([0.0, 0.0]);
+        tex_coords.push([1.0, 0.0]);
+        tex_coords.push([1.0, 1.0]);
+        tex_coords.push([0.0, 1.0]);
+    }
+
+    assert_eq!(tex_coords.len(), vertices.len());
+    assert_eq!(tex_coords.len(), colors.len());
+
+    let attributes = colors.into_iter().zip(tex_coords.into_iter()).map(|v| v.into()).collect::<Vec<_>>();
+
 
     Mesh::<CS> {
         vertices,
@@ -134,4 +148,3 @@ where
         attributes,
     }
 }
-*/

@@ -67,7 +67,7 @@ fn main() {
         std::f32::consts::FRAC_PI_2,
     );
 
-    let mesh = mesh::centered_quad(2.0);
+    let mesh = mesh::cube(1.0);
     //let mesh = mesh::triangle();
 
     let mut meshes = Vec::new();
@@ -93,10 +93,10 @@ fn main() {
         let t0 = Instant::now();
 
         let diff = start.elapsed().as_secs_f32();
-        let _world_matrix = math::transform::rotate::<math::WorldSpace>(diff, diff, 0.0);
+        let world_matrix = math::transform::rotate::<math::WorldSpace>(diff, diff, 0.0);
         let w = math::transform::rotate::<math::WorldSpace>(0.0, 0.0, diff);
         let vertex_shader = move |vertex: &math::Point3D<math::WorldSpace>| {
-            proj_matrix * view_matrix * vertex.extend(1.0)
+            proj_matrix * view_matrix * world_matrix * vertex.extend(1.0)
         };
 
         for mesh in &meshes {

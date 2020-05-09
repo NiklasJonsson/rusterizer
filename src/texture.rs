@@ -3,6 +3,7 @@ use std::path::Path;
 
 use crate::color::Color;
 
+// (0, 0) is upper left corner
 pub struct Texture {
     buf: Vec<u8>,
     width: usize,
