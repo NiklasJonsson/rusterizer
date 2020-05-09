@@ -78,17 +78,6 @@ where
     }
 }
 
-impl<CS, const N: usize> Div<f32> for Point<CS, { N }>
-where
-    CS: CoordinateSystem,
-{
-    type Output = Point<CS, { N }>;
-
-    fn div(self, other: f32) -> Self::Output {
-        Self(self.0 / other)
-    }
-}
-
 impl<CS, const N: usize> Mul<f32> for Point<CS, { N }>
 where
     CS: CoordinateSystem,

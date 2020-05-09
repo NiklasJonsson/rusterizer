@@ -68,6 +68,7 @@ fn main() {
     );
 
     let mesh = mesh::centered_quad(2.0);
+    //let mesh = mesh::triangle();
 
     let mut meshes = Vec::new();
     meshes.push(mesh);
@@ -84,9 +85,10 @@ fn main() {
 
     let fs_color =
         move |uniforms: &Uniforms, _: &rasterizer::FragCoords, attr: &VertexAttribute| attr.color;
-    let fs_debug = move |uniforms: &Uniforms,
-                         frag_coords: &rasterizer::FragCoords,
-                         attr: &VertexAttribute| Color::grayscale(attr.uvs[1]);
+    let fs_debug =
+        move |uniforms: &Uniforms, frag_coords: &rasterizer::FragCoords, attr: &VertexAttribute| {
+            Color::grayscale(frag_coords.depth)
+        };
     loop {
         let t0 = Instant::now();
 

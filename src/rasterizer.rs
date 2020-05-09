@@ -140,6 +140,7 @@ impl DepthBuffer {
     }
 
     fn set_depth(&mut self, row: usize, col: usize, depth: f32) {
+        assert!(depth >= 0.0 && depth <= 1.0, "Invalid depth: {}", depth);
         self.buffer[row * self.width + col] = depth;
     }
 }
@@ -147,22 +148,23 @@ impl DepthBuffer {
 struct Fragment<'a> {
     pub depth: f32,
     barycentrics: [f32; 3],
-    triangle_depths: &'a [f32; 3],
     triangle_attributes: &'a [VertexAttribute; 3],
 }
 
 impl<'a> Fragment<'a> {
-    fn perspective_interpolation(&self) -> VertexAttribute {
-        ((self.triangle_attributes[0] / self.triangle_depths[0]) * self.barycentrics[0]
-            + (self.triangle_attributes[1] / self.triangle_depths[1]) * self.barycentrics[1]
-            + (self.triangle_attributes[2] / self.triangle_depths[2]) * self.barycentrics[2])
-            * self.depth
-    }
-    fn linear_interpolation(&self) -> VertexAttribute {
+    fn interpolate(&self) -> VertexAttribute {
         self.triangle_attributes[0] * self.barycentrics[0]
             + self.triangle_attributes[1] * self.barycentrics[1]
             + self.triangle_attributes[2] * self.barycentrics[2]
     }
+}
+
+fn verify_barys(a: f32, b: f32, c: f32) {
+    let eps: f32 = 0.000001;
+    assert!(a >= 0.0 - eps && a <= 1.0 + eps, "{}", a);
+    assert!(b >= 0.0 - eps && b <= 1.0 + eps, "{}", b);
+    assert!(c >= 0.0 - eps && c <= 1.0 + eps, "{}", c);
+    assert!(a + b + c <= 1.0 + eps && a + b + c >= 0.0 - eps);
 }
 
 // Implicitly in 2D Screen space
@@ -172,14 +174,10 @@ struct RasterizerTriangle {
     depths_camera_space: [f32; 3],
     attributes: [VertexAttribute; 3],
     line_normals: [Vec2; 3],
-    area: f32,
+    inv_area: f32,
 }
 
 impl RasterizerTriangle {
-    fn area(vertices: &[Point2D; 3]) -> f32 {
-        (vertices[1] - vertices[0]).cross(vertices[2] - vertices[0]) * 0.5
-    }
-
     pub fn new(
         vertices: [Point3D<ScreenSpace>; 3],
         depths_camera_space: [f32; 3],
@@ -201,17 +199,16 @@ impl RasterizerTriangle {
 
         let line_normals = [n0, n1, n2];
 
-        // Cross product is the area of the parallelogram
         let v10 = vertices[1].xy() - vertices[0].xy();
         let v20 = vertices[2].xy() - vertices[0].xy();
-        let area = v10.cross(v20) * 0.5;
+        let inv_area = 1.0 / v10.cross(v20);
 
         Self {
             vertices,
             depths_camera_space,
             attributes,
             line_normals,
-            area,
+            inv_area,
         }
     }
 
@@ -223,32 +220,37 @@ impl RasterizerTriangle {
         ]
     }
 
+    // See realtime rendering on details
     fn fragment_with<'a>(&'a self, edge_functions: &[f32; 3]) -> Fragment<'a> {
-        let bary0 = 0.5 * edge_functions[1] / self.area;
-        let bary1 = 0.5 * edge_functions[2] / self.area;
+        // Linear barycentrics, used only for interpolating z
+        let bary0 = edge_functions[1] * self.inv_area;
+        let bary1 = edge_functions[2] * self.inv_area;
         let bary2 = 1.0 - bary0 - bary1;
+        verify_barys(bary0, bary1, bary2);
 
-        let barycentrics = [bary0, bary1, bary2];
+        // z here is in NDC and in that transform it was divided by w (camera space depth) which
+        // means we can interpolate it with the linear barycentrics. For attributes, we need
+        // perspective correct barycentrics;
+        let depth = bary0 * self.vertices[0].z()
+            + bary1 * self.vertices[1].z()
+            + bary2 * self.vertices[2].z();
 
-        // Perspective correct depth entails interpolating the inverse of the depth with
-        // barycentrics
-        // See https://www.comp.nus.edu.sg/~lowkl/publications/lowk_persp_interp_techrep.pdf for
-        // derivation
-        let depth_inv = bary0 * (1.0 / self.depths_camera_space[0])
-            + bary1 * (1.0 / self.depths_camera_space[1])
-            + bary2 * (1.0 / self.depths_camera_space[2]);
-        let depth = 1.0 / depth_inv;
+        // Perspective correct barycentrics.
+        // TODO: These should be moved to after the depth test
+        let f_u = edge_functions[1] / self.depths_camera_space[0];
+        let f_v = edge_functions[2] / self.depths_camera_space[1];
+        let f_w = edge_functions[0] / self.depths_camera_space[2];
+        let sum = f_u + f_v + f_w;
+        let u = f_u / sum;
+        let v = f_v / sum;
+        let w = f_w / sum;
+        let barycentrics = [u, v, w];
 
-        let _linear_depth = bary0 * self.depths_camera_space[0]
-            + bary1 * self.depths_camera_space[1]
-            + bary2 * self.depths_camera_space[2];
-
-        //let depth = _linear_depth;
+        verify_barys(u, v, w);
 
         Fragment {
             depth,
             barycentrics,
-            triangle_depths: &self.depths_camera_space,
             triangle_attributes: &self.attributes,
         }
     }
@@ -336,6 +338,7 @@ impl Rasterizer {
 
             // Remap to z range
             let z = (vert.z() + 1.0) * 0.5 * (zmax - zmin) + zmin;
+            assert!(z >= zmin && z <= zmax);
             Point3D::new(x, y, z)
         };
         let vertices = [
@@ -393,7 +396,7 @@ impl Rasterizer {
                         depth: fragment.depth,
                     };
 
-                    let col = fragment_shader(uniforms, &fc, &fragment.perspective_interpolation());
+                    let col = fragment_shader(uniforms, &fc, &fragment.interpolate());
                     self.write_pixel(i, j, col, fragment.depth);
                 }
             }

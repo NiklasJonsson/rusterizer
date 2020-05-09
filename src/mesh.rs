@@ -18,8 +18,8 @@ where
     let vertices = vec![
         Point3D::new(-width / 2.0, width / 2.0, 2.0),
         Point3D::new(width / 2.0, width / 2.0, 2.0),
-        Point3D::new(width / 2.0, -width / 2.0, 10.0),
-        Point3D::new(-width / 2.0, -width / 2.0, 10.0),
+        Point3D::new(width / 2.0, -width / 2.0, 2.0),
+        Point3D::new(-width / 2.0, -width / 2.0, 2.0),
     ];
 
     let attributes = vec![
@@ -43,9 +43,9 @@ where
     CS: CoordinateSystem,
 {
     let vertices = vec![
-        Point3D::new(-1.0, -2.0, 3.0),
-        Point3D::new(0.0, 1.0, 30.0),
-        Point3D::new(1.0, -2.0, 2.0),
+        Point3D::new(-1.0, -1.0, 2.0),
+        Point3D::new(0.0, 1.0, 20.0),
+        Point3D::new(1.0, -1.0, 2.0),
     ];
 
     let attributes = vec![
