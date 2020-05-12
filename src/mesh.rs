@@ -169,8 +169,6 @@ where
             let phi = std::f32::consts::PI * 2.0 * phi_ratio;
             let theta = std::f32::consts::PI * theta_ratio;
 
-            dbg!(&phi/std::f32::consts::PI * 180.0, &theta / std::f32::consts::PI * 180.0);
-
             let x = radius * theta.sin() * phi.cos();
             let y = radius * theta.cos();
             let z = radius * theta.sin() * phi.sin();
@@ -193,16 +191,7 @@ where
                 a: 1.0,
             };
 
-            attributes.push(
-                (
-                    c,
-                    [
-                        phi_ratio,
-                        theta_ratio,
-                    ],
-                )
-                    .into(),
-            );
+            attributes.push((c, [phi_ratio, theta_ratio]).into());
         }
     }
 
