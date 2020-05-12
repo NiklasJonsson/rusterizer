@@ -64,7 +64,7 @@ where
 
 pub fn cube<CS>(width: f32) -> Mesh<CS>
 where
-    CS: CoordinateSystem
+    CS: CoordinateSystem,
 {
     let vertices = vec![
         // Front
@@ -72,31 +72,26 @@ where
         Point3D::new(0.5, 0.5, -0.5) * width,
         Point3D::new(0.5, -0.5, -0.5) * width,
         Point3D::new(-0.5, -0.5, -0.5) * width,
-
         // Back
         Point3D::new(0.5, 0.5, 0.5) * width,
         Point3D::new(-0.5, 0.5, 0.5) * width,
         Point3D::new(-0.5, -0.5, 0.5) * width,
         Point3D::new(0.5, -0.5, 0.5) * width,
-
         // Left
         Point3D::new(-0.5, 0.5, 0.5) * width,
         Point3D::new(-0.5, 0.5, -0.5) * width,
         Point3D::new(-0.5, -0.5, -0.5) * width,
         Point3D::new(-0.5, -0.5, 0.5) * width,
-
         // Right
         Point3D::new(0.5, 0.5, -0.5) * width,
         Point3D::new(0.5, 0.5, 0.5) * width,
         Point3D::new(0.5, -0.5, 0.5) * width,
         Point3D::new(0.5, -0.5, -0.5) * width,
-
         // Top
         Point3D::new(-0.5, 0.5, -0.5) * width,
         Point3D::new(-0.5, 0.5, 0.5) * width,
         Point3D::new(0.5, 0.5, 0.5) * width,
         Point3D::new(0.5, 0.5, -0.5) * width,
-
         // Bottom
         Point3D::new(-0.5, -0.5, 0.5) * width,
         Point3D::new(-0.5, -0.5, -0.5) * width,
@@ -118,13 +113,11 @@ where
 
     let mut colors = Vec::new();
     for i in 0..vertices.len() {
-        colors.push(
-            match i % 3 {
+        colors.push(match i % 3 {
             0 => Color::red(),
             1 => Color::blue(),
             _ => Color::green(),
-            },
-        );
+        });
     }
 
     let mut tex_coords = Vec::with_capacity(vertices.len());
@@ -139,8 +132,79 @@ where
     assert_eq!(tex_coords.len(), vertices.len());
     assert_eq!(tex_coords.len(), colors.len());
 
-    let attributes = colors.into_iter().zip(tex_coords.into_iter()).map(|v| v.into()).collect::<Vec<_>>();
+    let attributes = colors
+        .into_iter()
+        .zip(tex_coords.into_iter())
+        .map(|v| v.into())
+        .collect::<Vec<_>>();
 
+    Mesh::<CS> {
+        vertices,
+        indices,
+        attributes,
+    }
+}
+
+pub fn sphere<CS>(radius: f32) -> Mesh<CS>
+where
+    CS: CoordinateSystem,
+{
+    // Left-handed, x right, y up, z forward.
+    // phi rotates around y. Theta from (0, 1, 0) to (0, -1, 0)
+    // ISO Spherical coordinates
+    // Note that phi is sampled once for the beginning and once for the end, to provide proper
+    // texture coordinates.
+    let n_phi_samples = 17;
+    let n_theta_samples = 9;
+
+    let mut vertices = Vec::with_capacity(n_phi_samples * n_theta_samples);
+    let mut indices = Vec::new();
+    let mut attributes = Vec::new();
+
+    for i in 0..n_theta_samples {
+        for j in 0..n_phi_samples {
+            let theta_ratio = i as f32 / (n_theta_samples - 1) as f32;
+            let phi_ratio = j as f32 / (n_phi_samples - 1) as f32;
+
+            let phi = std::f32::consts::PI * 2.0 * phi_ratio;
+            let theta = std::f32::consts::PI * theta_ratio;
+
+            dbg!(&phi/std::f32::consts::PI * 180.0, &theta / std::f32::consts::PI * 180.0);
+
+            let x = radius * theta.sin() * phi.cos();
+            let y = radius * theta.cos();
+            let z = radius * theta.sin() * phi.sin();
+            vertices.push(Point3D::<CS>::new(x, y, z));
+
+            if i < n_theta_samples - 1 && j < n_phi_samples - 1 {
+                indices.push(n_phi_samples * i + j);
+                indices.push(n_phi_samples * i + (j + 1));
+                indices.push(n_phi_samples * (i + 1) + (j + 1));
+
+                indices.push(n_phi_samples * i + j);
+                indices.push(n_phi_samples * (i + 1) + (j + 1));
+                indices.push(n_phi_samples * (i + 1) + j);
+            }
+
+            let c = Color {
+                r: x.abs(),
+                g: y.abs(),
+                b: z.abs(),
+                a: 1.0,
+            };
+
+            attributes.push(
+                (
+                    c,
+                    [
+                        phi_ratio,
+                        theta_ratio,
+                    ],
+                )
+                    .into(),
+            );
+        }
+    }
 
     Mesh::<CS> {
         vertices,
