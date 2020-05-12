@@ -239,8 +239,6 @@ impl RasterizerTriangle {
         let n1 = vec2(-v1.y(), v1.x());
         let n2 = vec2(-v2.y(), v2.x());
 
-        let line_normals = [n0, n1, n2];
-
         let v10 = vertices[1].xy() - vertices[0].xy();
         let v20 = vertices[2].xy() - vertices[0].xy();
         let inv_area = 1.0 / v10.cross(v20);

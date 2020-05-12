@@ -16,7 +16,6 @@ where
 }
 
 pub type Mat4<CSF, CST> = Matrix<CSF, CST, 4>;
-pub type Mat3<CSF, CST> = Matrix<CSF, CST, 3>;
 
 pub fn mat4<CSF, CST>(
     x00: f32,

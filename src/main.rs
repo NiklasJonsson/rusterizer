@@ -72,7 +72,7 @@ fn main() {
 
     let tex = texture::Texture::from_png_file("images/checkerboard.png");
 
-    let checkerboard_handle = renderer.bind_texture(tex);
+    let checkerboard_handle = renderer.uniforms().bind_texture(tex);
     let fs_tex = move |uniforms: &Uniforms, _: &rasterizer::FragCoords, attr: &VertexAttribute| {
         uniforms
             .get_texture(checkerboard_handle)
@@ -80,20 +80,24 @@ fn main() {
     };
 
     let fs_color =
-        move |uniforms: &Uniforms, _: &rasterizer::FragCoords, attr: &VertexAttribute| attr.color;
+        move |_: &Uniforms, _: &rasterizer::FragCoords, attr: &VertexAttribute| attr.color;
     let fs_debug =
-        move |uniforms: &Uniforms, frag_coords: &rasterizer::FragCoords, attr: &VertexAttribute| {
+        move |_: &Uniforms, frag_coords: &rasterizer::FragCoords, _: &VertexAttribute| {
             Color::grayscale(frag_coords.depth)
         };
+
+    let world_handle = renderer.uniforms().add_matrix();
+
+    let vertex_shader = move |uniforms: &Uniforms, vertex: &math::Point3D<math::WorldSpace>| {
+        proj_matrix * view_matrix * *uniforms.read_matrix(world_handle) * vertex.extend(1.0)
+    };
     loop {
         let t0 = Instant::now();
 
         let diff = start.elapsed().as_secs_f32();
         let world_matrix = math::rotate::<math::WorldSpace>(diff, diff, 0.0);
-        let w = math::rotate::<math::WorldSpace>(0.0, diff, 0.0);
-        let vertex_shader = move |vertex: &math::Point3D<math::WorldSpace>| {
-            proj_matrix * view_matrix * w * vertex.extend(1.0)
-        };
+
+        *renderer.uniforms().write_matrix(world_handle) = world_matrix;
 
         for mesh in &meshes {
             match args.fs {

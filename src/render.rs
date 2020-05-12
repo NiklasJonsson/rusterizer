@@ -3,8 +3,7 @@ use crate::graphics_primitives::*;
 use crate::math;
 use crate::mesh::Mesh;
 use crate::rasterizer::*;
-use crate::texture::Texture;
-use crate::uniform::{UniformHandle, Uniforms};
+use crate::uniform::Uniforms;
 
 pub struct Renderer {
     rasterizer: Rasterizer,
@@ -33,8 +32,8 @@ impl Renderer {
         }
     }
 
-    pub fn bind_texture(&mut self, tex: Texture) -> UniformHandle {
-        self.uniforms.bind_texture(tex)
+    pub fn uniforms(&mut self) -> &mut Uniforms {
+        &mut self.uniforms
     }
 
     fn primitive_assembly(
@@ -60,16 +59,21 @@ impl Renderer {
         triangles
     }
 
-    pub fn render<FragmentShader>(
+    pub fn render<FragmentShader, VertexShader>(
         &mut self,
         mesh: &Mesh<math::WorldSpace>,
-        vertex_shader: impl Fn(&math::Point3D<math::WorldSpace>) -> math::Point4D<math::ClipSpace>,
+        vertex_shader: VertexShader,
         fragment_shader: FragmentShader,
     ) where
+        VertexShader:
+            Fn(&Uniforms, &math::Point3D<math::WorldSpace>) -> math::Point4D<math::ClipSpace>,
         FragmentShader: Fn(&Uniforms, &FragCoords, &VertexAttribute) -> Color + Copy,
     {
-        let vertices: Vec<math::Point4D<math::ClipSpace>> =
-            mesh.vertices.iter().map(vertex_shader).collect::<Vec<_>>();
+        let vertices: Vec<math::Point4D<math::ClipSpace>> = mesh
+            .vertices
+            .iter()
+            .map(|v| vertex_shader(&self.uniforms, v))
+            .collect::<Vec<_>>();
 
         let tris = Renderer::primitive_assembly(&vertices, &mesh.attributes, &mesh.indices);
 

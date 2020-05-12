@@ -1,4 +1,4 @@
-use core::ops::{Div, Mul, Sub};
+use core::ops::{Mul, Sub};
 
 use crate::math::*;
 
