@@ -67,7 +67,8 @@ fn main() {
         std::f32::consts::FRAC_PI_2,
     );
 
-    let mut meshes = vec![mesh::sphere(1.0)];
+    let meshes = [mesh::cube(1.0), mesh::sphere(0.5)];
+    let mut matrices = [math::Mat4::<math::WorldSpace, math::WorldSpace>::identity(); 2];
     let start = Instant::now();
 
     let tex = texture::Texture::from_png_file("images/checkerboard.png");
@@ -95,11 +96,13 @@ fn main() {
         let t0 = Instant::now();
 
         let diff = start.elapsed().as_secs_f32();
-        let world_matrix = math::rotate::<math::WorldSpace>(diff, diff, 0.0);
 
-        *renderer.uniforms().write_matrix(world_handle) = world_matrix;
+        matrices[0] = math::rotate::<math::WorldSpace>(diff, diff, 0.0);
+        matrices[1] = math::rotate::<math::WorldSpace>(diff, 0.0, std::f32::consts::FRAC_PI_4)
+            * math::translate::<math::WorldSpace>(0.0, 3.0, 0.0);
 
-        for mesh in &meshes {
+        for (mesh, mat) in meshes.iter().zip(matrices.iter()) {
+            *renderer.uniforms().write_matrix(world_handle) = *mat;
             match args.fs {
                 FS::Texture => renderer.render(&mesh, vertex_shader, fs_tex),
                 FS::Color => renderer.render(&mesh, vertex_shader, fs_color),

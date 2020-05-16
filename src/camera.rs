@@ -38,7 +38,7 @@ impl Camera {
 
         let vec_to_pos: Vec3<WorldSpace> = self.pos - point::origin();
 
-        let translation_inv = transform::translation_along(-vec_to_pos);
+        let translation_inv = transform::translate_v(-vec_to_pos);
         rotation_inv * translation_inv
     }
 }

@@ -1,26 +1,18 @@
 use crate::math::*;
 
-pub fn translation_along<CS>(v: Vec3<CS>) -> Mat4<CS, CS>
+pub fn translate_v<CS>(v: Vec3<CS>) -> Mat4<CS, CS>
+where
+    CS: CoordinateSystem,
+{
+    translate(v.x(), v.y(), v.z())
+}
+
+pub fn translate<CS>(x: f32, y: f32, z: f32) -> Mat4<CS, CS>
 where
     CS: CoordinateSystem,
 {
     mat4::<CS, CS>(
-        1.0,
-        0.0,
-        0.0,
-        v.x(),
-        0.0,
-        1.0,
-        0.0,
-        v.y(),
-        0.0,
-        0.0,
-        1.0,
-        v.z(),
-        0.0,
-        0.0,
-        0.0,
-        1.0,
+        1.0, 0.0, 0.0, x, 0.0, 1.0, 0.0, y, 0.0, 0.0, 1.0, z, 0.0, 0.0, 0.0, 1.0,
     )
 }
 

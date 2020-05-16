@@ -5,6 +5,29 @@ use crate::mesh::Mesh;
 use crate::rasterizer::*;
 use crate::uniform::Uniforms;
 
+// Debug
+fn dump_vertices<CS: math::CoordinateSystem, const N: usize>(
+    vertices: &[math::Point<CS, { N }>],
+    fname: &str,
+) {
+    use std::io::Write;
+    let mut file = std::fs::File::create(fname).expect("failed to open file");
+    for (i, v) in vertices.iter().enumerate() {
+        file.write_fmt(format_args!("{}: ({}, {}, {})\n", i, v.x(), v.y(), v.z()));
+    }
+}
+
+fn dump_indices(indices: &[usize]) {
+    use std::io::Write;
+    let mut file = std::fs::File::create("index.txt").expect("failed to open file");
+    for (i, tri) in indices.chunks(3).enumerate() {
+        file.write_fmt(format_args!(
+            "{}: ({}, {}, {})\n",
+            i, tri[0], tri[1], tri[2]
+        ));
+    }
+}
+
 pub struct Renderer {
     rasterizer: Rasterizer,
     window: minifb::Window,
@@ -14,7 +37,7 @@ pub struct Renderer {
 impl Renderer {
     pub fn new(width: usize, height: usize) -> Renderer {
         let window = minifb::Window::new(
-            "Test - ESC to exit",
+            "Rusterizer - ESC to exit",
             width,
             height,
             minifb::WindowOptions::default(),

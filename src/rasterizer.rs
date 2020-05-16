@@ -209,6 +209,14 @@ impl EdgeFunctions {
     }
 }
 
+fn triangle_2x_area<CS: CoordinateSystem, const N: usize>(vertices: &[Point<CS, { N }>]) -> f32 {
+    let v10 = vertices[1].xy() - vertices[0].xy();
+    let v20 = vertices[2].xy() - vertices[0].xy();
+    v10.cross(v20)
+}
+
+const CULL_DEGENERATE_TRIANGLE_AREA_EPS: f32 = 0.000001;
+
 // Implicitly in 2D Screen space
 #[derive(Debug, Clone)]
 struct RasterizerTriangle {
@@ -216,7 +224,7 @@ struct RasterizerTriangle {
     depths_camera_space: [f32; 3],
     depths_ndc: [f32; 3],
     attributes: [VertexAttribute; 3],
-    inv_area: f32,
+    inv_2x_area: f32,
 }
 
 impl RasterizerTriangle {
@@ -239,9 +247,7 @@ impl RasterizerTriangle {
         let n1 = vec2(-v1.y(), v1.x());
         let n2 = vec2(-v2.y(), v2.x());
 
-        let v10 = vertices[1].xy() - vertices[0].xy();
-        let v20 = vertices[2].xy() - vertices[0].xy();
-        let inv_area = 1.0 / v10.cross(v20);
+        let inv_2x_area = 1.0 / triangle_2x_area(&vertices);
 
         let edge_functions = EdgeFunctions {
             points: [vertices[0].xy(), vertices[1].xy(), vertices[2].xy()],
@@ -254,7 +260,7 @@ impl RasterizerTriangle {
             depths_camera_space,
             depths_ndc: [vertices[0].z(), vertices[1].z(), vertices[2].z()],
             attributes,
-            inv_area,
+            inv_2x_area,
         }
     }
 
@@ -270,8 +276,8 @@ impl RasterizerTriangle {
     fn fragment<'a>(&'a self) -> Fragment<'a> {
         let edge_functions = &self.edge_functions.evaluated;
         // Linear barycentrics, used only for interpolating z
-        let bary0 = edge_functions[1] * self.inv_area;
-        let bary1 = edge_functions[2] * self.inv_area;
+        let bary0 = edge_functions[1] * self.inv_2x_area;
+        let bary1 = edge_functions[2] * self.inv_2x_area;
         let bary2 = 1.0 - bary0 - bary1;
         verify_barys(bary0, bary1, bary2);
 
@@ -412,7 +418,8 @@ impl Rasterizer {
     }
 
     fn can_cull(triangle: &Triangle<ClipSpace>) -> bool {
-        return triangle.vertices.iter().all(|x| x.w() <= 0.0);
+        triangle.vertices.iter().all(|x| x.w() <= 0.0)
+            || triangle_2x_area(&triangle.vertices).abs() < CULL_DEGENERATE_TRIANGLE_AREA_EPS
     }
 
     pub fn rasterize<FS>(
@@ -429,6 +436,7 @@ impl Rasterizer {
             }
 
             let triangle = Rasterizer::perspective_divide(triangle);
+
             let mut triangle = self.viewport_transform(triangle);
             let bounding_box = PixelBoundingBox::from(&triangle.edge_functions.points);
             for i in bounding_box.min_y..bounding_box.max_y {

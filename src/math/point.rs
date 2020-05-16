@@ -29,6 +29,10 @@ where
     CS: CoordinateSystem,
 {
     impl_accessors!(x, y, z, w);
+
+    pub fn xy(&self) -> Point2D {
+        Point2D::new(self.x(), self.y())
+    }
 }
 
 pub fn origin() -> Point3D<WorldSpace> {
@@ -60,10 +64,6 @@ where
 
     pub fn extend(&self, w: f32) -> Point4D<CS> {
         Point4D::new(self.x(), self.y(), self.z(), w)
-    }
-
-    pub fn xy(&self) -> Point2D {
-        Point2D::new(self.x(), self.y())
     }
 }
 

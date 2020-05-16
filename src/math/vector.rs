@@ -46,16 +46,6 @@ where
 
         self
     }
-
-    pub fn as_coordinate_system<CST>(self) -> Vector<CST, { N }>
-    where
-        CST: CoordinateSystem,
-    {
-        Vector::<CST, { N }> {
-            arr: self.arr,
-            coordinate_system: PhantomData,
-        }
-    }
 }
 
 impl<CS, const N: usize> From<[f32; N]> for Vector<CS, { N }>
