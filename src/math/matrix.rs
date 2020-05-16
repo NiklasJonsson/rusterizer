@@ -95,6 +95,13 @@ where
     }
 }
 
+impl<CSF, CST, const N: usize> std::cmp::Eq for Matrix<CSF, CST, { N }>
+where
+    CSF: CoordinateSystem,
+    CST: CoordinateSystem,
+{
+}
+
 impl<CSF, CST, const N: usize> Matrix<CSF, CST, { N }>
 where
     CSF: CoordinateSystem,
@@ -114,7 +121,7 @@ where
         result
     }
 
-    pub fn transpose(&mut self) -> Self {
+    pub fn transpose(&self) -> Self {
         let mut tmp = self.array.clone();
 
         for i in 0..N {
@@ -145,6 +152,14 @@ where
 
         Self {
             array,
+            _to_coordinate_space: PhantomData,
+            _from_coordinate_space: PhantomData,
+        }
+    }
+
+    pub fn from_raw(inp: &[[f32; 4]; 4]) -> Self {
+        Self {
+            array: inp.clone(),
             _to_coordinate_space: PhantomData,
             _from_coordinate_space: PhantomData,
         }
@@ -187,11 +202,90 @@ mod test {
     use super::*;
 
     #[test]
+    fn eq_operator() {
+        let mat = mat4::<WorldSpace, WorldSpace>(
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0,
+        );
+        let mat0 = Mat4::<WorldSpace>::identity();
+        let mat1 = Mat4::<WorldSpace>::identity();
+
+        assert_eq!(mat0, mat1);
+        assert_eq!(mat1, mat0);
+        assert_eq!(mat, mat);
+        assert_ne!(mat, mat0);
+        assert_ne!(mat0, mat);
+        assert_ne!(mat, mat1);
+        assert_ne!(mat1, mat);
+    }
+
+    #[test]
     fn mul_identity() {
         let mat0 = Mat4::<WorldSpace>::identity();
         let mat1 = Mat4::<WorldSpace>::identity();
         let r = mat0 * mat1;
-        assert_eq!(mat0, mat1);
+        assert_eq!(r, mat0);
         assert_eq!(r, mat1);
+    }
+
+    #[test]
+    fn rows() {
+        let mat = mat4::<WorldSpace, WorldSpace>(
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0,
+        );
+        assert_eq!(mat.row(0), [1.0, 2.0, 3.0, 4.0]);
+        assert_eq!(mat.row(1), [5.0, 6.0, 7.0, 8.0]);
+        assert_eq!(mat.row(2), [9.0, 10.0, 11.0, 12.0]);
+        assert_eq!(mat.row(3), [13.0, 14.0, 15.0, 16.0]);
+    }
+
+    #[test]
+    fn columns() {
+        let mat = mat4::<WorldSpace, WorldSpace>(
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0,
+        );
+        assert_eq!(mat.col(0), [1.0, 5.0, 9.0, 13.0]);
+        assert_eq!(mat.col(1), [2.0, 6.0, 10.0, 14.0]);
+        assert_eq!(mat.col(2), [3.0, 7.0, 11.0, 15.0]);
+        assert_eq!(mat.col(3), [4.0, 8.0, 12.0, 16.0]);
+    }
+
+    #[test]
+    fn transpose() {
+        let mat = mat4::<WorldSpace, WorldSpace>(
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0,
+        );
+
+        let mat_transpose = mat4::<WorldSpace, WorldSpace>(
+            1.0, 5.0, 9.0, 13.0, 2.0, 6.0, 10.0, 14.0, 3.0, 7.0, 11.0, 15.0, 4.0, 8.0, 12.0, 16.0,
+        );
+
+        assert_eq!(mat.transpose(), mat_transpose);
+        assert_eq!(mat, mat_transpose.transpose());
+    }
+
+    #[test]
+    fn mul() {
+        let mat = mat4::<WorldSpace, WorldSpace>(
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0,
+        );
+
+        let a = [
+            [90., 100., 110., 120.],
+            [202., 228., 254., 280.],
+            [314., 356., 398., 440.],
+            [426., 484., 542., 600.],
+        ];
+
+        let result = Mat4::<WorldSpace>::from_raw(&a);
+        assert_eq!(mat * mat, result);
+
+        let a = [
+            [30., 70., 110., 150.],
+            [70., 174., 278., 382.],
+            [110., 278., 446., 614.],
+            [150., 382., 614., 846.],
+        ];
+        let result = Mat4::<WorldSpace>::from_raw(&a);
+        assert_eq!(mat * mat.transpose(), result);
     }
 }

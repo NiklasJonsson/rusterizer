@@ -38,7 +38,7 @@ impl Uniforms {
 
     pub fn add_matrix(&mut self) -> MatrixHandle {
         self.matrices
-            .push(math::Mat4::<math::WorldSpace, math::WorldSpace>::identity());
+            .push(math::Mat4::<math::WorldSpace>::identity());
 
         MatrixHandle {
             index: self.matrices.len() - 1,

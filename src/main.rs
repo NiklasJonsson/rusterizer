@@ -68,7 +68,7 @@ fn main() {
     );
 
     let meshes = [mesh::cube(1.0), mesh::sphere(0.5)];
-    let mut matrices = [math::Mat4::<math::WorldSpace, math::WorldSpace>::identity(); 2];
+    let mut matrices = [math::Mat4::<math::WorldSpace>::identity(); 2];
     let start = Instant::now();
 
     let tex = texture::Texture::from_png_file("images/checkerboard.png");

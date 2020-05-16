@@ -1,13 +1,13 @@
 use crate::math::*;
 
-pub fn translate_v<CS>(v: Vec3<CS>) -> Mat4<CS, CS>
+pub fn translate_v<CS>(v: Vec3<CS>) -> Mat4<CS>
 where
     CS: CoordinateSystem,
 {
     translate(v.x(), v.y(), v.z())
 }
 
-pub fn translate<CS>(x: f32, y: f32, z: f32) -> Mat4<CS, CS>
+pub fn translate<CS>(x: f32, y: f32, z: f32) -> Mat4<CS>
 where
     CS: CoordinateSystem,
 {
@@ -16,7 +16,7 @@ where
     )
 }
 
-pub fn rotate_x<CS>(rad: f32) -> Mat4<CS, CS>
+pub fn rotate_x<CS>(rad: f32) -> Mat4<CS>
 where
     CS: CoordinateSystem,
 {
@@ -40,7 +40,7 @@ where
     )
 }
 
-pub fn rotate_y<CS>(rad: f32) -> Mat4<CS, CS>
+pub fn rotate_y<CS>(rad: f32) -> Mat4<CS>
 where
     CS: CoordinateSystem,
 {
@@ -64,7 +64,7 @@ where
     )
 }
 
-pub fn rotate_z<CS>(rad: f32) -> Mat4<CS, CS>
+pub fn rotate_z<CS>(rad: f32) -> Mat4<CS>
 where
     CS: CoordinateSystem,
 {
@@ -88,7 +88,7 @@ where
     )
 }
 
-pub fn rotate<CS>(x: f32, y: f32, z: f32) -> Mat4<CS, CS>
+pub fn rotate<CS>(x: f32, y: f32, z: f32) -> Mat4<CS>
 where
     CS: CoordinateSystem,
 {
