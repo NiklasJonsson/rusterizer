@@ -15,7 +15,7 @@ where
     _to_coordinate_space: PhantomData<CST>,
 }
 
-pub type Mat4<CSF, CST> = Matrix<CSF, CST, 4>;
+pub type Mat4<CSF, CST = CSF> = Matrix<CSF, CST, 4>;
 
 pub fn mat4<CSF, CST>(
     x00: f32,
@@ -75,6 +75,23 @@ where
             _from_coordinate_space: PhantomData,
             _to_coordinate_space: PhantomData,
         }
+    }
+}
+
+impl<CSF, CST, const N: usize> std::cmp::PartialEq for Matrix<CSF, CST, { N }>
+where
+    CSF: CoordinateSystem,
+    CST: CoordinateSystem,
+{
+    fn eq(&self, other: &Self) -> bool {
+        for i in 0..N {
+            for j in 0..N {
+                if self.array[i][j] != other.array[i][j] {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 }
 
@@ -162,5 +179,19 @@ where
             N,
             s
         )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn mul_identity() {
+        let mat0 = Mat4::<WorldSpace>::identity();
+        let mat1 = Mat4::<WorldSpace>::identity();
+        let r = mat0 * mat1;
+        assert_eq!(mat0, mat1);
+        assert_eq!(r, mat1);
     }
 }
