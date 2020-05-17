@@ -13,7 +13,8 @@ fn dump_vertices<CS: math::CoordinateSystem, const N: usize>(
     use std::io::Write;
     let mut file = std::fs::File::create(fname).expect("failed to open file");
     for (i, v) in vertices.iter().enumerate() {
-        file.write_fmt(format_args!("{}: ({}, {}, {})\n", i, v.x(), v.y(), v.z()));
+        file.write_fmt(format_args!("{}: ({}, {}, {})\n", i, v.x(), v.y(), v.z()))
+            .expect("Failed to write!");
     }
 }
 
@@ -24,9 +25,15 @@ fn dump_indices(indices: &[usize]) {
         file.write_fmt(format_args!(
             "{}: ({}, {}, {})\n",
             i, tri[0], tri[1], tri[2]
-        ));
+        ))
+        .expect("Failed to write!");
     }
 }
+
+pub type VertexShader =
+    fn(&Uniforms, &math::Point3D<math::WorldSpace>) -> math::Point4D<math::ClipSpace>;
+
+pub type FragmentShader = fn(&Uniforms, &FragCoords, &VertexAttribute) -> Color;
 
 pub struct Renderer {
     rasterizer: Rasterizer,
@@ -82,16 +89,12 @@ impl Renderer {
         triangles
     }
 
-    pub fn render<FragmentShader, VertexShader>(
+    pub fn render(
         &mut self,
         mesh: &Mesh<math::WorldSpace>,
         vertex_shader: VertexShader,
         fragment_shader: FragmentShader,
-    ) where
-        VertexShader:
-            Fn(&Uniforms, &math::Point3D<math::WorldSpace>) -> math::Point4D<math::ClipSpace>,
-        FragmentShader: Fn(&Uniforms, &FragCoords, &VertexAttribute) -> Color + Copy,
-    {
+    ) {
         let vertices: Vec<math::Point4D<math::ClipSpace>> = mesh
             .vertices
             .iter()

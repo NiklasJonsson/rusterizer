@@ -1,61 +1,46 @@
-use crate::math;
+use crate::math::{CameraSpace, ClipSpace, Mat4, WorldSpace};
 use crate::texture::Texture;
 
-#[derive(Copy, Clone, Debug)]
-pub struct TextureHandle {
-    index: usize,
+#[derive(Clone, Debug)]
+pub struct UniformBlock {
+    pub world: Mat4<WorldSpace>,
+    pub view: Mat4<WorldSpace, CameraSpace>,
+    pub projection: Mat4<CameraSpace, ClipSpace>,
 }
 
-#[derive(Copy, Clone, Debug)]
-pub struct MatrixHandle {
-    index: usize,
-}
-
+#[derive(Clone, Debug)]
 pub struct Uniforms {
     textures: Vec<Texture>,
-    matrices: Vec<math::Mat4<math::WorldSpace, math::WorldSpace>>,
+    uniform_block: UniformBlock,
 }
 
 impl Uniforms {
     pub fn new() -> Self {
         Uniforms {
             textures: Vec::new(),
-            matrices: Vec::new(),
+            uniform_block: UniformBlock {
+                world: Mat4::<WorldSpace>::identity(),
+                view: Mat4::<WorldSpace, CameraSpace>::identity(),
+                projection: Mat4::<CameraSpace, ClipSpace>::identity(),
+            },
         }
     }
 
-    pub fn bind_texture(&mut self, tex: Texture) -> TextureHandle {
-        // This does not allow removing textures
+    pub fn bind_texture(&mut self, index: usize, tex: Texture) {
+        // TODO: Proper support for arbitrary (needs remapping vec)
+        assert!(self.textures.len() == index);
         self.textures.push(tex);
-        TextureHandle {
-            index: self.textures.len() - 1,
-        }
     }
 
-    pub fn get_texture(&self, handle: TextureHandle) -> &Texture {
-        &self.textures[handle.index]
+    pub fn get_texture(&self, index: usize) -> &Texture {
+        &self.textures[index]
     }
 
-    pub fn add_matrix(&mut self) -> MatrixHandle {
-        self.matrices
-            .push(math::Mat4::<math::WorldSpace>::identity());
-
-        MatrixHandle {
-            index: self.matrices.len() - 1,
-        }
+    pub fn read_block(&self) -> &UniformBlock {
+        &self.uniform_block
     }
 
-    pub fn read_matrix(
-        &self,
-        handle: MatrixHandle,
-    ) -> &math::Mat4<math::WorldSpace, math::WorldSpace> {
-        &self.matrices[handle.index]
-    }
-
-    pub fn write_matrix(
-        &mut self,
-        handle: MatrixHandle,
-    ) -> &mut math::Mat4<math::WorldSpace, math::WorldSpace> {
-        &mut self.matrices[handle.index]
+    pub fn write_block(&mut self) -> &mut UniformBlock {
+        &mut self.uniform_block
     }
 }

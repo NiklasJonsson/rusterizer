@@ -4,11 +4,22 @@ use std::path::Path;
 use crate::color::Color;
 
 // (0, 0) is upper left corner
+#[derive(Clone)]
 pub struct Texture {
     buf: Vec<u8>,
     width: usize,
     height: usize,
     texel_width: usize,
+}
+
+impl std::fmt::Debug for Texture {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Texture ({} channels), w: {}, h: {}",
+            self.texel_width, self.width, self.height
+        )
+    }
 }
 
 impl Texture {

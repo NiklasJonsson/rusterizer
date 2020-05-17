@@ -51,6 +51,18 @@ fn parse_args() -> Args {
     ret
 }
 
+fn choose_shader(args: &Args) -> FragmentShader {
+    match args.fs {
+        FS::Texture => |uniforms: &Uniforms, _: &rasterizer::FragCoords, attr: &VertexAttribute| {
+            uniforms.get_texture(0).sample(attr.uvs[0], attr.uvs[1])
+        },
+        FS::Color => |_: &Uniforms, _: &rasterizer::FragCoords, attr: &VertexAttribute| attr.color,
+        FS::Debug => |_: &Uniforms, frag_coords: &rasterizer::FragCoords, _: &VertexAttribute| {
+            Color::grayscale(frag_coords.depth)
+        },
+    }
+}
+
 fn main() {
     let args = parse_args();
     let camera = camera::Camera::default();
@@ -60,39 +72,33 @@ fn main() {
     let mut avg = Duration::new(0, 0);
     let mut iterations = 0;
 
-    let view_matrix = camera.get_view_matrix();
-    let proj_matrix = math::project(
-        1.0,
-        200.0,
-        HEIGHT as f32 / WIDTH as f32,
-        std::f32::consts::FRAC_PI_2,
-    );
+    {
+        let block = renderer.uniforms().write_block();
+        block.view = camera.get_view_matrix();
+        block.projection = math::project(
+            1.0,
+            200.0,
+            HEIGHT as f32 / WIDTH as f32,
+            std::f32::consts::FRAC_PI_2,
+        );
+    }
+
+    let tex = texture::Texture::from_png_file("images/checkerboard.png");
+    renderer.uniforms().bind_texture(0, tex);
 
     let meshes = [mesh::cube(1.0), mesh::sphere(0.5)];
     let mut matrices = [math::Mat4::<math::WorldSpace>::identity(); 2];
+
+    let vertex_shader = |uniforms: &Uniforms, vertex: &math::Point3D<math::WorldSpace>| {
+        uniforms.read_block().projection
+            * uniforms.read_block().view
+            * uniforms.read_block().world
+            * vertex.extend(1.0)
+    };
+
+    let fragment_shader = choose_shader(&args);
+
     let start = Instant::now();
-
-    let tex = texture::Texture::from_png_file("images/checkerboard.png");
-
-    let checkerboard_handle = renderer.uniforms().bind_texture(tex);
-    let fs_tex = move |uniforms: &Uniforms, _: &rasterizer::FragCoords, attr: &VertexAttribute| {
-        uniforms
-            .get_texture(checkerboard_handle)
-            .sample(attr.uvs[0], attr.uvs[1])
-    };
-
-    let fs_color =
-        move |_: &Uniforms, _: &rasterizer::FragCoords, attr: &VertexAttribute| attr.color;
-    let fs_debug =
-        move |_: &Uniforms, frag_coords: &rasterizer::FragCoords, _: &VertexAttribute| {
-            Color::grayscale(frag_coords.depth)
-        };
-
-    let world_handle = renderer.uniforms().add_matrix();
-
-    let vertex_shader = move |uniforms: &Uniforms, vertex: &math::Point3D<math::WorldSpace>| {
-        proj_matrix * view_matrix * *uniforms.read_matrix(world_handle) * vertex.extend(1.0)
-    };
     loop {
         let t0 = Instant::now();
 
@@ -103,12 +109,8 @@ fn main() {
             * math::translate::<math::WorldSpace>(0.0, 3.0, 0.0);
 
         for (mesh, mat) in meshes.iter().zip(matrices.iter()) {
-            *renderer.uniforms().write_matrix(world_handle) = *mat;
-            match args.fs {
-                FS::Texture => renderer.render(&mesh, vertex_shader, fs_tex),
-                FS::Color => renderer.render(&mesh, vertex_shader, fs_color),
-                FS::Debug => renderer.render(&mesh, vertex_shader, fs_debug),
-            }
+            renderer.uniforms().write_block().world = *mat;
+            renderer.render(&mesh, vertex_shader, fragment_shader);
         }
 
         avg = (avg * iterations + t0.elapsed()) / (iterations + 1);

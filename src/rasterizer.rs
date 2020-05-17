@@ -160,8 +160,8 @@ impl<'a> Fragment<'a> {
 }
 
 fn clamp_bary(x: f32) -> f32 {
-    const eps: f32 = 0.0005;
-    debug_assert!(x >= 0.0 - eps && x <= 1.0 + eps, "{}", x);
+    const EPS: f32 = 0.0005;
+    debug_assert!(x >= 0.0 - EPS && x <= 1.0 + EPS, "{}", x);
     x.clamp(0.0, 1.0)
 }
 
@@ -427,14 +427,12 @@ impl Rasterizer {
             || triangle_2x_area(vertices).abs() < CULL_DEGENERATE_TRIANGLE_AREA_EPS
     }
 
-    pub fn rasterize<FS>(
+    pub fn rasterize(
         &mut self,
         triangles: &[Triangle<ClipSpace>],
         uniforms: &Uniforms,
-        fragment_shader: FS,
-    ) where
-        FS: Fn(&Uniforms, &FragCoords, &VertexAttribute) -> Color + Copy,
-    {
+        fragment_shader: crate::render::FragmentShader,
+    ) {
         for triangle in triangles {
             if Rasterizer::can_cull(&triangle.vertices) {
                 continue;
