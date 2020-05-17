@@ -226,7 +226,7 @@ const CULL_DEGENERATE_TRIANGLE_AREA_EPS: f32 = 0.000001;
 struct RasterizerTriangle {
     edge_functions: EdgeFunctions,
     depths_camera_space: [f32; 3],
-    depths_ndc: [f32; 3],
+    depths: [f32; 3],
     attributes: [VertexAttribute; 3],
     inv_2x_area: f32,
 }
@@ -262,7 +262,7 @@ impl RasterizerTriangle {
         Self {
             edge_functions,
             depths_camera_space,
-            depths_ndc: [vertices[0].z(), vertices[1].z(), vertices[2].z()],
+            depths: [vertices[0].z(), vertices[1].z(), vertices[2].z()],
             attributes,
             inv_2x_area,
         }
@@ -291,8 +291,7 @@ impl RasterizerTriangle {
         // z here is in NDC and in that transform it was divided by w (camera space depth) which
         // means we can interpolate it with the linear barycentrics. For attributes, we need
         // perspective correct barycentrics
-        let depth =
-            bary0 * self.depths_ndc[0] + bary1 * self.depths_ndc[1] + bary2 * self.depths_ndc[2];
+        let depth = bary0 * self.depths[0] + bary1 * self.depths[1] + bary2 * self.depths[2];
 
         // Perspective correct barycentrics.
         // TODO: These should be moved to after the depth test
@@ -591,5 +590,177 @@ mod tests {
         assert_eq!(bb.max_x, 500);
         assert_eq!(bb.min_y, 100);
         assert_eq!(bb.max_y, 201);
+    }
+
+    #[test]
+    fn viewport_transform_1() {
+        const WIDTH: usize = 400;
+        const HEIGHT: usize = 500;
+
+        let rasterizer = Rasterizer::new(WIDTH, HEIGHT);
+
+        let vertices = [
+            Point4D::<NDC>::new(-1.0, 0.5, -0.5, 5.0),
+            Point4D::<NDC>::new(1.0, 0.5, 0.0, 6.0),
+            Point4D::<NDC>::new(0.0, -0.5, 0.5, 7.0),
+        ];
+
+        let vertex_attributes = [
+            (Color::red(), [0.0, 0.0]).into(),
+            (Color::red(), [0.0, 0.0]).into(),
+            (Color::red(), [0.0, 0.0]).into(),
+        ];
+
+        let tri = Triangle::<NDC> {
+            vertices,
+            vertex_attributes,
+        };
+
+        let rast_tri = rasterizer.viewport_transform(tri);
+
+        for i in 0..3 {
+            assert_eq!(rast_tri.depths_camera_space[i], vertices[i].w());
+        }
+
+        assert_eq!(rast_tri.depths[0], 0.25);
+        assert_eq!(rast_tri.depths[1], 0.5);
+        assert_eq!(rast_tri.depths[2], 0.75);
+
+        assert_eq!(rast_tri.inv_2x_area, 0.00001);
+
+        // Y is flipped in screen space
+        assert_eq!(rast_tri.edge_functions.points[0], Point2D::new(0.0, 125.0));
+        assert_eq!(
+            rast_tri.edge_functions.points[1],
+            Point2D::new(400.0, 125.0)
+        );
+        assert_eq!(
+            rast_tri.edge_functions.points[2],
+            Point2D::new(200.0, 375.0)
+        );
+    }
+
+    #[test]
+    fn viewport_transform_2() {
+        const WIDTH: usize = 400;
+        const HEIGHT: usize = 500;
+
+        let rasterizer = Rasterizer::new(WIDTH, HEIGHT);
+
+        let vertices = [
+            Point4D::<NDC>::new(-0.25, 1.0, -1.0, 5.0),
+            Point4D::<NDC>::new(0.5, 0.0, 0.0, 6.0),
+            Point4D::<NDC>::new(0.25, -1.0, 1.0, 7.0),
+        ];
+
+        let vertex_attributes = [
+            (Color::red(), [0.0, 0.0]).into(),
+            (Color::red(), [0.0, 0.0]).into(),
+            (Color::red(), [0.0, 0.0]).into(),
+        ];
+
+        let tri = Triangle::<NDC> {
+            vertices,
+            vertex_attributes,
+        };
+
+        let rast_tri = rasterizer.viewport_transform(tri);
+
+        for i in 0..3 {
+            assert_eq!(rast_tri.depths_camera_space[i], vertices[i].w());
+        }
+
+        assert_eq!(rast_tri.depths[0], 0.0);
+        assert_eq!(rast_tri.depths[1], 0.5);
+        assert_eq!(rast_tri.depths[2], 1.0);
+
+        assert_eq!(rast_tri.inv_2x_area, 0.00002);
+
+        assert_eq!(rast_tri.edge_functions.points[0], Point2D::new(150.0, 0.0));
+        assert_eq!(
+            rast_tri.edge_functions.points[1],
+            Point2D::new(300.0, 250.0)
+        );
+        assert_eq!(
+            rast_tri.edge_functions.points[2],
+            Point2D::new(250.0, 500.0)
+        );
+    }
+
+    #[test]
+    fn edge_functions() {
+        const WIDTH: usize = 400;
+        const HEIGHT: usize = 600;
+
+        let rasterizer = Rasterizer::new(WIDTH, HEIGHT);
+
+        let vertices = [
+            Point4D::<NDC>::new(-0.5, 0.0, 0.0, 5.0),
+            Point4D::<NDC>::new(0.0, 0.5, 0.0, 6.0),
+            Point4D::<NDC>::new(0.5, 0.0, 0.0, 7.0),
+        ];
+
+        let vertex_attributes = [
+            (Color::red(), [0.0, 0.0]).into(),
+            (Color::red(), [0.0, 0.0]).into(),
+            (Color::red(), [0.0, 0.0]).into(),
+        ];
+
+        let tri = Triangle::<NDC> {
+            vertices,
+            vertex_attributes,
+        };
+
+        let mut rast_tri = rasterizer.viewport_transform(tri);
+
+        assert_eq!(
+            rast_tri.edge_functions.points[0],
+            Point2D::new(100.0, 300.0)
+        );
+        assert_eq!(
+            rast_tri.edge_functions.points[1],
+            Point2D::new(200.0, 150.0)
+        );
+
+        assert_eq!(
+            rast_tri.edge_functions.points[2],
+            Point2D::new(300.0, 300.0)
+        );
+
+        rast_tri.eval_edge_functions(200.0, 200.0);
+        assert!(rast_tri.inside());
+
+        rast_tri.eval_edge_functions(99.0, 299.0);
+        assert!(!rast_tri.inside());
+        rast_tri.eval_edge_functions(101.0, 299.0);
+        assert!(rast_tri.inside());
+
+        rast_tri.eval_edge_functions(200.0, 149.0);
+        assert!(!rast_tri.inside());
+        rast_tri.eval_edge_functions(200.0, 151.0);
+        assert!(rast_tri.inside());
+
+        rast_tri.eval_edge_functions(301.0, 300.0);
+        assert!(!rast_tri.inside());
+        rast_tri.eval_edge_functions(299.0, 299.0);
+        assert!(rast_tri.inside());
+
+        // Testing the tie-breaker rules.
+        rast_tri.eval_edge_functions(150.0, 225.0);
+        assert!(rast_tri.inside());
+        assert_eq!(rast_tri.edge_functions.evaluated[0], 0.0);
+        assert_eq!(rast_tri.edge_functions.normals[0].x() > 0.0, true);
+
+        rast_tri.eval_edge_functions(250.0, 225.0);
+        assert!(!rast_tri.inside());
+        assert_eq!(rast_tri.edge_functions.evaluated[1], 0.0);
+        assert_eq!(rast_tri.edge_functions.normals[1].x() < 0.0, true);
+
+        rast_tri.eval_edge_functions(250.0, 300.0);
+        assert!(rast_tri.inside());
+        assert_eq!(rast_tri.edge_functions.evaluated[2], 0.0);
+        assert_eq!(rast_tri.edge_functions.normals[2].x() == 0.0, true);
+        assert_eq!(rast_tri.edge_functions.normals[2].y() < 0.0, true);
+
     }
 }
