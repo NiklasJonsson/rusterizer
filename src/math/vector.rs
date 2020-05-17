@@ -201,6 +201,10 @@ impl<CS: CoordinateSystem> Vec3<CS> {
         let z = v0[0] * v1[1] - v0[1] * v1[0];
         vec3(x, y, z)
     }
+
+    pub fn extend(&self, w: f32) -> Vec4<CS> {
+        vec4(self.arr[0], self.arr[1], self.arr[2], w)
+    }
 }
 
 pub type Vec4<CS> = Vector<CS, { 4 }>;
@@ -371,4 +375,102 @@ mod tests {
             }
         }
     }
+
+   #[test]
+    fn mat4_mul_identity() {
+        let v = [
+            vec4::<WorldSpace>(3.0, 10.34, 1.0, 0.0),
+            vec4::<WorldSpace>(13.0, 10.90, -15.0, 0.0),
+            vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 0.0),
+            vec4::<WorldSpace>(3.0, 10.34, 1.0, 1.0),
+            vec4::<WorldSpace>(13.0, 10.90, -15.0, 1.0),
+            vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 1.0),
+        ];
+
+
+         let expected = [
+            vec4::<WorldSpace>(3.0, 10.34, 1.0, 0.0),
+            vec4::<WorldSpace>(13.0, 10.90, -15.0, 0.0),
+            vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 0.0),
+            vec4::<WorldSpace>(3.0, 10.34, 1.0, 1.0),
+            vec4::<WorldSpace>(13.0, 10.90, -15.0, 1.0),
+            vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 1.0),
+         ];
+
+        for j in 0..v.len() {
+            assert_eq!(Mat4::<WorldSpace>::identity() * v[j], expected[j]);
+            
+        }
+    }
+
+   #[test]
+    fn mat4_mul_translate() {
+        let v = [
+            vec4::<WorldSpace>(3.0, 10.34, 1.0, 0.0),
+            vec4::<WorldSpace>(13.0, 10.90, -15.0, 0.0),
+            vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 0.0),
+            vec4::<WorldSpace>(3.0, 10.34, 1.0, 1.0),
+            vec4::<WorldSpace>(13.0, 10.90, -15.0, 1.0),
+            vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 1.0),
+        ];
+
+        let expected = [
+           vec4::<WorldSpace>(3.0, 10.34, 1.0, 0.0),
+            vec4::<WorldSpace>(13.0, 10.90, -15.0, 0.0),
+            vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 0.0),
+            vec4::<WorldSpace>(7.0, 8.34, 5.5, 1.0),
+            vec4::<WorldSpace>(17.0, 8.90, -10.5, 1.0),
+            vec4::<WorldSpace>(-10341.1240, -1.0877, -10.5, 1.0),
+
+        ];
+
+        let mat4s = [
+            transform::translate::<WorldSpace>(4.0, -2.0, 4.5),
+        ];
+
+        for i in 0..1 {
+            for j in 0..v.len() {
+                assert_eq!(mat4s[i] * v[j], expected[i * 3 + j]);
+            }
+        }
+    }
+
+   #[test]
+    fn mat4_mul_rotate_lh() {
+        let v = [
+            vec3::<WorldSpace>(1.0, 0.0, 0.0),
+            vec3::<WorldSpace>(0.0, 1.0, 0.0),
+            vec3::<WorldSpace>(0.0, 0.0, 1.0),
+        ];
+
+        let expected = [
+            vec3::<WorldSpace>(1.0, 0.0, 0.0),
+            vec3::<WorldSpace>(0.0, -0.00000004371139, 1.0),
+            vec3::<WorldSpace>(0.0, -1.0, -0.00000004371139),
+
+            vec3::<WorldSpace>(-0.00000004371139, 0.0, -1.0),
+            vec3::<WorldSpace>(0.0, 1.0, 0.0),
+            vec3::<WorldSpace>(1.0, 0.0, -0.00000004371139),
+
+            vec3::<WorldSpace>(-0.00000004371139, 1.0, 0.0),
+            vec3::<WorldSpace>(-1.0, -0.00000004371139, 0.0),
+            vec3::<WorldSpace>(0.0, 0.0, 1.0),
+        ];
+
+        let mat4s = [
+            transform::rotate_x::<WorldSpace>(std::f32::consts::FRAC_PI_2),
+            transform::rotate_y::<WorldSpace>(std::f32::consts::FRAC_PI_2),
+            transform::rotate_z::<WorldSpace>(std::f32::consts::FRAC_PI_2),
+        ];
+
+        for i in 0..mat4s.len() {
+            for j in 0..v.len() {
+                assert_eq!(mat4s[i] * v[j].extend(0.0), expected[i * 3 + j].extend(0.0));
+                assert_eq!(mat4s[i] * v[j].extend(1.0), expected[i * 3 + j].extend(1.0));
+            }
+        }
+    }
+
+
+
 }
