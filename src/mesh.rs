@@ -121,7 +121,7 @@ where
     }
 
     let mut tex_coords = Vec::with_capacity(vertices.len());
-    assert_eq!(vertices.len() % 4, 0);
+    debug_assert_eq!(vertices.len() % 4, 0);
     for _ in 0..vertices.len() / 4 {
         tex_coords.push([0.0, 0.0]);
         tex_coords.push([1.0, 0.0]);
@@ -129,8 +129,8 @@ where
         tex_coords.push([0.0, 1.0]);
     }
 
-    assert_eq!(tex_coords.len(), vertices.len());
-    assert_eq!(tex_coords.len(), colors.len());
+    debug_assert_eq!(tex_coords.len(), vertices.len());
+    debug_assert_eq!(tex_coords.len(), colors.len());
 
     let attributes = colors
         .into_iter()

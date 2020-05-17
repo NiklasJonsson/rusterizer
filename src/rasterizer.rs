@@ -33,8 +33,8 @@ impl From<&[Point2D; 3]> for PixelBoundingBox {
             vals.2.floor() as usize,
             vals.3.ceil() as usize,
         );
-        assert!(min_x < max_x, "{} < {}", min_x, max_x);
-        assert!(min_y < max_y, "{} < {}", min_y, max_y);
+        debug_assert!(min_x < max_x, "{} < {}", min_x, max_x);
+        debug_assert!(min_y < max_y, "{} < {}", min_y, max_y);
         Self {
             min_x,
             max_x,
@@ -78,7 +78,7 @@ impl ColorBuffer {
 
     // Clear to dark grey
     fn clear(&mut self) {
-        assert_eq!(self.buffer.len(), self.height * self.width);
+        debug_assert_eq!(self.buffer.len(), self.height * self.width);
         for i in 0..self.width {
             for j in 0..self.height {
                 self.set_pixel(
@@ -129,7 +129,7 @@ impl DepthBuffer {
     }
 
     fn clear(&mut self) {
-        assert_eq!(self.buffer.len(), self.height * self.width);
+        debug_assert_eq!(self.buffer.len(), self.height * self.width);
         for i in 0..self.width * self.height {
             self.buffer[i] = f32::MAX;
         }
@@ -140,7 +140,7 @@ impl DepthBuffer {
     }
 
     fn set_depth(&mut self, row: usize, col: usize, depth: f32) {
-        assert!(depth >= 0.0 && depth <= 1.0, "Invalid depth: {}", depth);
+        debug_assert!(depth >= 0.0 && depth <= 1.0, "Invalid depth: {}", depth);
         self.buffer[row * self.width + col] = depth;
     }
 }
@@ -159,12 +159,10 @@ impl<'a> Fragment<'a> {
     }
 }
 
-fn verify_barys(a: f32, b: f32, c: f32) {
-    let eps: f32 = 0.000003;
-    assert!(a >= 0.0 - eps && a <= 1.0 + eps, "{}", a);
-    assert!(b >= 0.0 - eps && b <= 1.0 + eps, "{}", b);
-    assert!(c >= 0.0 - eps && c <= 1.0 + eps, "{}", c);
-    assert!(a + b + c <= 1.0 + eps && a + b + c >= 0.0 - eps);
+fn clamp_bary(x: f32) -> f32 {
+    const eps: f32 = 0.0005;
+    debug_assert!(x >= 0.0 - eps && x <= 1.0 + eps, "{}", x);
+    x.clamp(0.0, 1.0)
 }
 
 #[derive(Debug, Clone)]
@@ -182,6 +180,12 @@ impl EdgeFunctions {
             self.normals[1].dot(p - self.points[1]),
             self.normals[2].dot(p - self.points[2]),
         ];
+    }
+
+    fn step_x(&mut self) {
+        for i in 0..self.evaluated.len() {
+            self.evaluated[i] += self.normals[i].x();
+        }
     }
 
     fn inside(&self) -> bool {
@@ -268,6 +272,10 @@ impl RasterizerTriangle {
         self.edge_functions.eval(x, y);
     }
 
+    fn step_edge_func_x(&mut self) {
+        self.edge_functions.step_x();
+    }
+
     fn inside(&self) -> bool {
         self.edge_functions.inside()
     }
@@ -276,13 +284,9 @@ impl RasterizerTriangle {
     fn fragment<'a>(&'a self) -> Fragment<'a> {
         let edge_functions = &self.edge_functions.evaluated;
         // Linear barycentrics, used only for interpolating z
-        let bary0 = edge_functions[1] * self.inv_2x_area;
-        let bary1 = edge_functions[2] * self.inv_2x_area;
-        let bary2 = 1.0 - bary0 - bary1;
-        verify_barys(bary0, bary1, bary2);
-        let bary0 = bary0.clamp(0.0, 1.0);
-        let bary1 = bary1.clamp(0.0, 1.0);
-        let bary2 = bary2.clamp(0.0, 1.0);
+        let bary0 = clamp_bary(edge_functions[1] * self.inv_2x_area);
+        let bary1 = clamp_bary(edge_functions[2] * self.inv_2x_area);
+        let bary2 = clamp_bary(1.0 - bary0 - bary1);
 
         // z here is in NDC and in that transform it was divided by w (camera space depth) which
         // means we can interpolate it with the linear barycentrics. For attributes, we need
@@ -296,13 +300,11 @@ impl RasterizerTriangle {
         let f_v = edge_functions[2] / self.depths_camera_space[1];
         let f_w = edge_functions[0] / self.depths_camera_space[2];
         let sum = f_u + f_v + f_w;
-        let u = f_u / sum;
-        let v = f_v / sum;
-        let w = 1.0 - u - v;
+        let u = clamp_bary(f_u / sum);
+        let v = clamp_bary(f_v / sum);
+        let w = clamp_bary(1.0 - u - v);
 
-        verify_barys(u, v, w);
-
-        let barycentrics = [u.clamp(0.0, 1.0), v.clamp(0.0, 1.0), w.clamp(0.0, 1.0)];
+        let barycentrics = [u, v, w];
         Fragment {
             depth,
             barycentrics,
@@ -383,9 +385,9 @@ impl Rasterizer {
         let zmin = 0.0;
         let zmax = 1.0;
         let new_vert = |vert: Point4D<NDC>| {
-            assert!(vert.x() <= 1.0 && vert.x() >= -1.0);
-            assert!(vert.y() <= 1.0 && vert.y() >= -1.0);
-            assert!(vert.z() <= 1.0 && vert.z() >= -1.0);
+            debug_assert!(vert.x() <= 1.0 && vert.x() >= -1.0);
+            debug_assert!(vert.y() <= 1.0 && vert.y() >= -1.0);
+            debug_assert!(vert.z() <= 1.0 && vert.z() >= -1.0);
 
             let x = self.width as f32 * (vert.x() + 1.0) / 2.0;
             // Flip y as color buffer start upper left
@@ -393,7 +395,7 @@ impl Rasterizer {
 
             // Remap to z range
             let z = (vert.z() + 1.0) * 0.5 * (zmax - zmin) + zmin;
-            assert!(z >= zmin && z <= zmax);
+            debug_assert!(z >= zmin && z <= zmax);
             Point3D::new(x, y, z)
         };
         let vertices = [
@@ -441,13 +443,11 @@ impl Rasterizer {
             let triangle = Rasterizer::perspective_divide(triangle);
 
             let mut triangle = self.viewport_transform(triangle);
-            let bounding_box = PixelBoundingBox::from(&triangle.edge_functions.points);
-            for i in bounding_box.min_y..bounding_box.max_y {
-                for j in bounding_box.min_x..bounding_box.max_x {
+            let b_box = PixelBoundingBox::from(&triangle.edge_functions.points);
+            for i in b_box.min_y..b_box.max_y {
+                triangle.eval_edge_functions(b_box.min_x as f32 + 0.5, i as f32 + 0.5);
+                for j in b_box.min_x..b_box.max_x {
                     // Sample middle of pixel
-                    let x = j as f32 + 0.5;
-                    let y = i as f32 + 0.5;
-                    triangle.eval_edge_functions(x, y);
                     if triangle.inside() {
                         let fragment = triangle.fragment();
                         if self.query_depth(i, j) < fragment.depth {
@@ -455,14 +455,15 @@ impl Rasterizer {
                         }
 
                         let fc = FragCoords {
-                            x,
-                            y,
+                            x: j as f32 + 0.5,
+                            y: i as f32 + 0.5,
                             depth: fragment.depth,
                         };
 
                         let col = fragment_shader(uniforms, &fc, &fragment.interpolate());
                         self.write_pixel(i, j, col, fragment.depth);
                     }
+                    triangle.step_edge_func_x();
                 }
             }
         }
