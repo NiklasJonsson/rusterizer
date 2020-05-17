@@ -24,6 +24,18 @@ pub type Point2D = Point<Any2D, 2>;
 pub type Point3D<CS> = Point<CS, 3>;
 pub type Point4D<CS> = Point<CS, 4>;
 
+// Deriving these does work atm, so have to do it manually
+impl<CS, const N: usize> PartialEq for Point<CS, { N }>
+where
+    CS: CoordinateSystem,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl<CS, const N: usize> Eq for Point<CS, { N }> where CS: CoordinateSystem {}
+
 impl<CS, const N: usize> Point<CS, { N }>
 where
     CS: CoordinateSystem,
@@ -63,7 +75,7 @@ where
     }
 
     pub fn extend(&self, w: f32) -> Point4D<CS> {
-        Point4D::new(self.x(), self.y(), self.z(), w)
+        Point::<CS, 4>(self.0.extend(w))
     }
 }
 

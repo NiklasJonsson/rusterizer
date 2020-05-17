@@ -286,7 +286,7 @@ impl RasterizerTriangle {
 
         // z here is in NDC and in that transform it was divided by w (camera space depth) which
         // means we can interpolate it with the linear barycentrics. For attributes, we need
-        // perspective correct barycentrics;
+        // perspective correct barycentrics
         let depth =
             bary0 * self.depths_ndc[0] + bary1 * self.depths_ndc[1] + bary2 * self.depths_ndc[2];
 
@@ -420,9 +420,9 @@ impl Rasterizer {
         self.depth_buffers[self.buf_idx].set_depth(row, col, depth);
     }
 
-    fn can_cull(triangle: &Triangle<ClipSpace>) -> bool {
-        triangle.vertices.iter().all(|x| x.w() <= 0.0)
-            || triangle_2x_area(&triangle.vertices).abs() < CULL_DEGENERATE_TRIANGLE_AREA_EPS
+    fn can_cull(vertices: &[Point4D<ClipSpace>]) -> bool {
+        vertices.iter().all(|x| x.w() <= 0.0)
+            || triangle_2x_area(vertices).abs() < CULL_DEGENERATE_TRIANGLE_AREA_EPS
     }
 
     pub fn rasterize<FS>(
@@ -434,7 +434,7 @@ impl Rasterizer {
         FS: Fn(&Uniforms, &FragCoords, &VertexAttribute) -> Color + Copy,
     {
         for triangle in triangles {
-            if Rasterizer::can_cull(triangle) {
+            if Rasterizer::can_cull(&triangle.vertices) {
                 continue;
             }
 
@@ -474,5 +474,94 @@ impl Rasterizer {
         self.depth_buffers[self.buf_idx].clear();
         self.color_buffers[self.buf_idx].clear();
         &self.color_buffers[prev]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn no_culling() {
+        let vertices = [
+            Point4D::<ClipSpace>::new(-0.5, 0.0, 0.0, 1.0),
+            Point4D::<ClipSpace>::new(0.0, 1.0, 0.0, 1.0),
+            Point4D::<ClipSpace>::new(0.5, 0.0, 0.0, 1.0),
+        ];
+
+        assert_eq!(Rasterizer::can_cull(&vertices), false);
+
+        // Note that this should probably be partially culled
+        // and reconstructed
+        let vertices = [
+            Point4D::<ClipSpace>::new(-0.5, 1.0, 0.0, -1.0),
+            Point4D::<ClipSpace>::new(0.0, 1.0, 0.0, 2.0),
+            Point4D::<ClipSpace>::new(0.5, 1.0, 0.0, 0.0),
+        ];
+
+        assert_eq!(Rasterizer::can_cull(&vertices), true);
+    }
+
+    #[test]
+    fn cull_degenerate() {
+        let vertices = [
+            Point4D::<ClipSpace>::new(0.0, 0.0, 0.0, 1.0),
+            Point4D::<ClipSpace>::new(0.0, 1.0, 0.0, 1.0),
+            Point4D::<ClipSpace>::new(0.0, 0.0, 0.0, 1.0),
+        ];
+
+        assert_eq!(Rasterizer::can_cull(&vertices), true);
+
+        let vertices = [
+            Point4D::<ClipSpace>::new(-0.5, 1.0, 0.0, 1.0),
+            Point4D::<ClipSpace>::new(0.0, 1.0, 0.0, 1.0),
+            Point4D::<ClipSpace>::new(0.5, 1.0, 0.0, 1.0),
+        ];
+
+        assert_eq!(Rasterizer::can_cull(&vertices), true);
+    }
+
+    #[test]
+    fn cull_near() {
+        let vertices = [
+            Point4D::<ClipSpace>::new(-0.5, 1.0, 0.0, -1.0),
+            Point4D::<ClipSpace>::new(0.0, 1.0, 0.0, -2.0),
+            Point4D::<ClipSpace>::new(0.5, 1.0, 0.0, 0.0),
+        ];
+
+        assert_eq!(Rasterizer::can_cull(&vertices), true);
+    }
+
+    #[test]
+    fn perspective_divide() {
+        let vertices = [
+            Point4D::<ClipSpace>::new(-0.5, 0.9, 0.0, 10.0),
+            Point4D::<ClipSpace>::new(0.08, 0.3, 0.0, 2.0),
+            Point4D::<ClipSpace>::new(0.5, -0.3, 0.0, 1.0),
+        ];
+
+        let vertex_attributes = [
+            (Color::red(), [0.0, 0.0]).into(),
+            (Color::red(), [0.0, 0.0]).into(),
+            (Color::red(), [0.0, 0.0]).into(),
+        ];
+
+        let tri = Triangle::<ClipSpace> {
+            vertices,
+            vertex_attributes,
+        };
+
+        let tri_ndc = Rasterizer::perspective_divide(&tri);
+
+        let expected = [
+            Point4D::<NDC>::new(-0.05, 0.089999996, 0.0, 10.0),
+            Point4D::<NDC>::new(0.04, 0.15, 0.0, 2.0),
+            Point4D::<NDC>::new(0.5, -0.3, 0.0, 1.0),
+        ];
+
+        assert_eq!(expected.len(), tri_ndc.vertices.len());
+        for i in 0..expected.len() {
+            assert_eq!(tri_ndc.vertices[i], expected[i]);
+        }
     }
 }

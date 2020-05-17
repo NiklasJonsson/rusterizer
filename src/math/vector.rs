@@ -376,7 +376,7 @@ mod tests {
         }
     }
 
-   #[test]
+    #[test]
     fn mat4_mul_identity() {
         let v = [
             vec4::<WorldSpace>(3.0, 10.34, 1.0, 0.0),
@@ -387,23 +387,21 @@ mod tests {
             vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 1.0),
         ];
 
-
-         let expected = [
+        let expected = [
             vec4::<WorldSpace>(3.0, 10.34, 1.0, 0.0),
             vec4::<WorldSpace>(13.0, 10.90, -15.0, 0.0),
             vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 0.0),
             vec4::<WorldSpace>(3.0, 10.34, 1.0, 1.0),
             vec4::<WorldSpace>(13.0, 10.90, -15.0, 1.0),
             vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 1.0),
-         ];
+        ];
 
         for j in 0..v.len() {
             assert_eq!(Mat4::<WorldSpace>::identity() * v[j], expected[j]);
-            
         }
     }
 
-   #[test]
+    #[test]
     fn mat4_mul_translate() {
         let v = [
             vec4::<WorldSpace>(3.0, 10.34, 1.0, 0.0),
@@ -415,18 +413,15 @@ mod tests {
         ];
 
         let expected = [
-           vec4::<WorldSpace>(3.0, 10.34, 1.0, 0.0),
+            vec4::<WorldSpace>(3.0, 10.34, 1.0, 0.0),
             vec4::<WorldSpace>(13.0, 10.90, -15.0, 0.0),
             vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 0.0),
             vec4::<WorldSpace>(7.0, 8.34, 5.5, 1.0),
             vec4::<WorldSpace>(17.0, 8.90, -10.5, 1.0),
             vec4::<WorldSpace>(-10341.1240, -1.0877, -10.5, 1.0),
-
         ];
 
-        let mat4s = [
-            transform::translate::<WorldSpace>(4.0, -2.0, 4.5),
-        ];
+        let mat4s = [transform::translate::<WorldSpace>(4.0, -2.0, 4.5)];
 
         for i in 0..1 {
             for j in 0..v.len() {
@@ -435,7 +430,7 @@ mod tests {
         }
     }
 
-   #[test]
+    #[test]
     fn mat4_mul_rotate_lh() {
         let v = [
             vec3::<WorldSpace>(1.0, 0.0, 0.0),
@@ -447,11 +442,9 @@ mod tests {
             vec3::<WorldSpace>(1.0, 0.0, 0.0),
             vec3::<WorldSpace>(0.0, -0.00000004371139, 1.0),
             vec3::<WorldSpace>(0.0, -1.0, -0.00000004371139),
-
             vec3::<WorldSpace>(-0.00000004371139, 0.0, -1.0),
             vec3::<WorldSpace>(0.0, 1.0, 0.0),
             vec3::<WorldSpace>(1.0, 0.0, -0.00000004371139),
-
             vec3::<WorldSpace>(-0.00000004371139, 1.0, 0.0),
             vec3::<WorldSpace>(-1.0, -0.00000004371139, 0.0),
             vec3::<WorldSpace>(0.0, 0.0, 1.0),
@@ -470,7 +463,4 @@ mod tests {
             }
         }
     }
-
-
-
 }
