@@ -563,4 +563,33 @@ mod tests {
             assert_eq!(tri_ndc.vertices[i], expected[i]);
         }
     }
+
+    #[test]
+    fn bounding_box() {
+        let points = [
+            Point2D::new(100.0, 200.0),
+            Point2D::new(230.0, 200.0),
+            Point2D::new(230.0, 300.0),
+        ];
+
+        let bb = PixelBoundingBox::from(&points);
+
+        assert_eq!(bb.min_x, 100);
+        assert_eq!(bb.max_x, 230);
+        assert_eq!(bb.min_y, 200);
+        assert_eq!(bb.max_y, 300);
+
+        let points = [
+            Point2D::new(50.9, 200.0),
+            Point2D::new(230.0, 100.0),
+            Point2D::new(500.0, 200.9),
+        ];
+
+        let bb = PixelBoundingBox::from(&points);
+
+        assert_eq!(bb.min_x, 50);
+        assert_eq!(bb.max_x, 500);
+        assert_eq!(bb.min_y, 100);
+        assert_eq!(bb.max_y, 201);
+    }
 }
