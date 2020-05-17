@@ -1,5 +1,6 @@
 #![feature(const_generics)]
 #![feature(unsized_locals)]
+#![feature(clamp)]
 
 use std::time::{Duration, Instant};
 

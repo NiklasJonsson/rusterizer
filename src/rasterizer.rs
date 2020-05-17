@@ -160,7 +160,7 @@ impl<'a> Fragment<'a> {
 }
 
 fn verify_barys(a: f32, b: f32, c: f32) {
-    let eps: f32 = 0.000001;
+    let eps: f32 = 0.000003;
     assert!(a >= 0.0 - eps && a <= 1.0 + eps, "{}", a);
     assert!(b >= 0.0 - eps && b <= 1.0 + eps, "{}", b);
     assert!(c >= 0.0 - eps && c <= 1.0 + eps, "{}", c);
@@ -280,6 +280,9 @@ impl RasterizerTriangle {
         let bary1 = edge_functions[2] * self.inv_2x_area;
         let bary2 = 1.0 - bary0 - bary1;
         verify_barys(bary0, bary1, bary2);
+        let bary0 = bary0.clamp(0.0, 1.0);
+        let bary1 = bary1.clamp(0.0, 1.0);
+        let bary2 = bary2.clamp(0.0, 1.0);
 
         // z here is in NDC and in that transform it was divided by w (camera space depth) which
         // means we can interpolate it with the linear barycentrics. For attributes, we need
@@ -295,11 +298,11 @@ impl RasterizerTriangle {
         let sum = f_u + f_v + f_w;
         let u = f_u / sum;
         let v = f_v / sum;
-        let w = f_w / sum;
-        let barycentrics = [u, v, w];
+        let w = 1.0 - u - v;
 
         verify_barys(u, v, w);
 
+        let barycentrics = [u.clamp(0.0, 1.0), v.clamp(0.0, 1.0), w.clamp(0.0, 1.0)];
         Fragment {
             depth,
             barycentrics,

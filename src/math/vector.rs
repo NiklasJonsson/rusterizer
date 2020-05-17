@@ -39,14 +39,23 @@ where
     }
 
     pub fn normalize(mut self) -> Self {
-        let len = self.len();
-        for i in 0..N {
-            self.arr[i] /= len;
-        }
-
-        self
+        self / self.len()
     }
 }
+
+impl<CS, const N: usize> std::cmp::PartialEq for Vector<CS, { N }>
+where
+    CS: CoordinateSystem,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.arr
+            .iter()
+            .zip(other.arr.iter())
+            .fold(true, |acc, (a, b)| acc && a == b)
+    }
+}
+
+impl<CS, const N: usize> std::cmp::Eq for Vector<CS, { N }> where CS: CoordinateSystem {}
 
 impl<CS, const N: usize> From<[f32; N]> for Vector<CS, { N }>
 where
@@ -144,7 +153,7 @@ where
     CS: PrintableType + CoordinateSystem,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // TODO: Avoid trainling comma
+        // TODO: Avoid trailing comma
         let s = self
             .arr
             .iter()
@@ -221,6 +230,145 @@ where
         Self::Output {
             arr: result,
             coordinate_system: PhantomData,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn equality() {
+        let v = vec3::<WorldSpace>(0.0, 0.0, 0.0).len();
+        let v1 = vec3::<WorldSpace>(1.0, 2.0, 3.0).len();
+        let v2 = vec3::<WorldSpace>(1.0, 2.0, 3.0).len();
+        assert_eq!(v, v);
+        assert_eq!(v1, v1);
+        assert_eq!(v1, v2);
+        assert_ne!(v, v1);
+        assert_ne!(v, v2);
+        let v3 = vec3::<WorldSpace>(3.0, 2.0, 3.0).len();
+
+        assert_ne!(v3, v);
+        assert_ne!(v3, v1);
+        assert_ne!(v3, v2);
+    }
+
+    #[test]
+    fn length() {
+        assert_eq!(vec3::<WorldSpace>(0.0, 0.0, 0.0).len(), 0.0);
+        assert_eq!(vec3::<WorldSpace>(1.0, 0.0, 0.0).len(), 1.0);
+        assert_eq!(vec3::<WorldSpace>(0.0, 1.0, 0.0).len(), 1.0);
+        assert_eq!(vec3::<WorldSpace>(0.0, 0.0, 1.0).len(), 1.0);
+        assert_eq!(vec3::<WorldSpace>(-1.0, 0.0, 0.0).len(), 1.0);
+        assert_eq!(vec3::<WorldSpace>(0.0, -1.0, 0.0).len(), 1.0);
+        assert_eq!(vec3::<WorldSpace>(0.0, 0.0, -1.0).len(), 1.0);
+        assert_eq!(vec3::<WorldSpace>(3.0, 10.0, 1.0).len(), 10.488089);
+    }
+
+    #[test]
+    fn normalize() {
+        assert_eq!(vec3::<WorldSpace>(3.0, 10.760, 1.0).normalize().len(), 1.0);
+        assert_eq!(vec3::<WorldSpace>(8.0, 10.0, 1.0).normalize().len(), 1.0);
+        assert_eq!(vec3::<WorldSpace>(3.0, 143.5, 1.0).normalize().len(), 1.0);
+        assert_eq!(
+            vec3::<WorldSpace>(63.0, 2234.5, -1.0).normalize().len(),
+            1.0
+        );
+        assert_eq!(
+            vec3::<WorldSpace>(23.0, -1546.1, 1324.0).normalize().len(),
+            1.0
+        );
+        assert_eq!(
+            vec3::<WorldSpace>(99.0, 14.0, -123.0).normalize().len(),
+            1.0
+        );
+    }
+
+    #[test]
+    fn neg() {
+        assert_eq!(
+            -vec3::<WorldSpace>(3.0, 10.760, 1.0),
+            vec3::<WorldSpace>(-3.0, -10.760, -1.0)
+        );
+        assert_eq!(
+            -vec3::<WorldSpace>(8.0, 10.0, 1.0),
+            vec3::<WorldSpace>(-8.0, -10.0, -1.0)
+        );
+        assert_eq!(
+            -vec3::<WorldSpace>(3.0, 143.5, 1.0),
+            vec3::<WorldSpace>(-3.0, -143.5, -1.0)
+        );
+        assert_eq!(
+            -vec3::<WorldSpace>(63.0, 2234.5, -1.0),
+            vec3::<WorldSpace>(-63.0, -2234.5, 1.0)
+        );
+        assert_eq!(
+            -vec3::<WorldSpace>(23.0, -1546.1, 1324.0),
+            vec3::<WorldSpace>(-23.0, 1546.1, -1324.0)
+        );
+        assert_eq!(
+            -vec3::<WorldSpace>(99.0, 14.0, -123.0),
+            vec3::<WorldSpace>(-99.0, -14.0, 123.0)
+        );
+    }
+
+    #[test]
+    fn mul() {
+        assert_eq!(
+            vec3::<WorldSpace>(3.0, 10.90, 1.0) * 10.0,
+            vec3::<WorldSpace>(30.0, 109.0, 10.0)
+        );
+        assert_eq!(
+            vec3::<WorldSpace>(13.0, 10.90, -15.0) * 2.0,
+            vec3::<WorldSpace>(26.0, 21.8, -30.0)
+        );
+        assert_eq!(
+            vec3::<WorldSpace>(13.0, 10.90, -15.0) * -3.0,
+            vec3::<WorldSpace>(-39.0, -32.699997, 45.0)
+        );
+    }
+
+    #[test]
+    fn div() {
+        assert_eq!(
+            vec3::<WorldSpace>(3.0, 10.90, 1.0) / 10.0,
+            vec3::<WorldSpace>(0.3, 1.0899999, 0.1)
+        );
+        assert_eq!(
+            vec3::<WorldSpace>(13.0, 10.90, -15.0) / 2.0,
+            vec3::<WorldSpace>(6.5, 5.45, -7.5)
+        );
+        assert_eq!(
+            vec3::<WorldSpace>(13.0, 10.90, -15.0) / -3.0,
+            vec3::<WorldSpace>(-4.333333333333, -3.6333332, 5.0)
+        );
+    }
+
+    #[test]
+    fn add() {
+        let v = [
+            vec3::<WorldSpace>(3.0, 10.34, 1.0),
+            vec3::<WorldSpace>(13.0, 10.90, -15.0),
+            vec3::<WorldSpace>(-10345.1240, 0.9123, -15.0),
+        ];
+
+        let expected = [
+            vec3::<WorldSpace>(6.0, 20.68, 2.0),
+            vec3::<WorldSpace>(16.0, 21.24, -14.0),
+            vec3::<WorldSpace>(-10342.1240, 11.2523, -14.0),
+            vec3::<WorldSpace>(16.0, 21.24, -14.0),
+            vec3::<WorldSpace>(26.0, 21.80, -30.0),
+            vec3::<WorldSpace>(-10332.1240, 11.8123, -30.0),
+            vec3::<WorldSpace>(-10342.1240, 11.2523, -14.0),
+            vec3::<WorldSpace>(-10332.1240, 11.8123, -30.0),
+            vec3::<WorldSpace>(-20690.248, 1.8246, -30.0),
+        ];
+        for i in 0..3 {
+            for j in 0..3 {
+                assert_eq!(v[i] + v[j], expected[i * 3 + j]);
+            }
         }
     }
 }
