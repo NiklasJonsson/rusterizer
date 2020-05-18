@@ -147,15 +147,25 @@ impl DepthBuffer {
 
 struct Fragment<'a> {
     pub depth: f32,
-    barycentrics: [f32; 3],
+    edge_functions: &'a [f32; 3],
+    depths_camera_space: &'a [f32; 3],
     triangle_attributes: &'a [VertexAttribute; 3],
 }
 
 impl<'a> Fragment<'a> {
     fn interpolate(&self) -> VertexAttribute {
-        self.triangle_attributes[0] * self.barycentrics[0]
-            + self.triangle_attributes[1] * self.barycentrics[1]
-            + self.triangle_attributes[2] * self.barycentrics[2]
+        // Perspective correct barycentrics.
+        let f_u = self.edge_functions[1] / self.depths_camera_space[0];
+        let f_v = self.edge_functions[2] / self.depths_camera_space[1];
+        let f_w = self.edge_functions[0] / self.depths_camera_space[2];
+        let sum = f_u + f_v + f_w;
+        let u = clamp_bary(f_u / sum);
+        let v = clamp_bary(f_v / sum);
+        let w = clamp_bary(1.0 - u - v);
+
+        self.triangle_attributes[0] * u
+            + self.triangle_attributes[1] * v
+            + self.triangle_attributes[2] * w
     }
 }
 
@@ -293,20 +303,10 @@ impl RasterizerTriangle {
         // perspective correct barycentrics
         let depth = bary0 * self.depths[0] + bary1 * self.depths[1] + bary2 * self.depths[2];
 
-        // Perspective correct barycentrics.
-        // TODO: These should be moved to after the depth test
-        let f_u = edge_functions[1] / self.depths_camera_space[0];
-        let f_v = edge_functions[2] / self.depths_camera_space[1];
-        let f_w = edge_functions[0] / self.depths_camera_space[2];
-        let sum = f_u + f_v + f_w;
-        let u = clamp_bary(f_u / sum);
-        let v = clamp_bary(f_v / sum);
-        let w = clamp_bary(1.0 - u - v);
-
-        let barycentrics = [u, v, w];
         Fragment {
             depth,
-            barycentrics,
+            edge_functions,
+            depths_camera_space: &self.depths_camera_space,
             triangle_attributes: &self.attributes,
         }
     }
@@ -761,6 +761,5 @@ mod tests {
         assert_eq!(rast_tri.edge_functions.evaluated[2], 0.0);
         assert_eq!(rast_tri.edge_functions.normals[2].x() == 0.0, true);
         assert_eq!(rast_tri.edge_functions.normals[2].y() < 0.0, true);
-
     }
 }
