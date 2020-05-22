@@ -11,37 +11,12 @@ pub struct Color {
 }
 
 impl Color {
-    pub fn to_rgba(&self) -> u32 {
-        (self.r * 255.0) as u32
-            | ((self.g * 255.0) as u32) << 8
-            | ((self.b * 255.0) as u32) << 16
-            | ((self.a * 255.0) as u32) << 24
-    }
-
-    pub fn to_bgra(&self) -> u32 {
-        (self.b * 255.0) as u32
-            | ((self.g * 255.0) as u32) << 8
+    pub fn to_argb(self) -> u32 {
+        ((self.a * 255.0) as u32) << 24
             | ((self.r * 255.0) as u32) << 16
-            | ((self.a * 255.0) as u32) << 24
+            | ((self.g * 255.0) as u32) << 8
+            | ((self.b * 255.0) as u32) << 0
     }
-
-    pub fn to_argb(&self) -> u32 {
-        (self.a * 255.0) as u32
-            | ((self.r * 255.0) as u32) << 8
-            | ((self.g * 255.0) as u32) << 16
-            | ((self.b * 255.0) as u32) << 24
-    }
-
-    /* Untested
-    pub fn from_rgba(rgba: u32) -> Self {
-        Color {
-            r: ((rgba & 0xF) as f32) / 255.0,
-            g: (((rgba & 0xF0) << 8) as f32) / 255.0,
-            b: (((rgba & 0xF00) << 16) as f32) / 255.0,
-            a: (((rgba & 0xF000) << 24) as f32) / 255.0,
-        }
-    }
-    */
 
     pub fn from_rgba(rgba: [u8; 4]) -> Self {
         Color {
@@ -131,5 +106,38 @@ impl Add<Color> for Color {
             b: self.b + other.b,
             a: self.a + other.a,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn argb() {
+        let c = Color {
+            r: 1.0,
+            g: 1.0,
+            b: 1.0,
+            a: 1.0,
+        };
+        assert_eq!(c.to_argb(), 0xFFFFFFFF);
+
+        let c = Color::red();
+        assert_eq!(c.to_argb(), 0xFFFF0000);
+
+        let c = Color::green();
+        assert_eq!(c.to_argb(), 0xFF00FF00);
+
+        let c = Color::blue();
+        assert_eq!(c.to_argb(), 0xFF0000FF);
+
+        let c = Color {
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+            a: 1.0,
+        };
+        assert_eq!(c.to_argb(), 0xFF000000);
     }
 }

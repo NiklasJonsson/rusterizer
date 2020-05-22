@@ -58,7 +58,7 @@ fn choose_shader(args: &Args) -> FragmentShader {
         },
         FS::Color => |_: &Uniforms, _: &rasterizer::FragCoords, attr: &VertexAttribute| attr.color,
         FS::Debug => |_: &Uniforms, frag_coords: &rasterizer::FragCoords, _: &VertexAttribute| {
-            Color::grayscale(frag_coords.depth)
+            Color::grayscale(frag_coords.depths[0])
         },
     }
 }
@@ -113,12 +113,8 @@ fn main() {
             renderer.render(&mesh, vertex_shader, fragment_shader);
         }
 
-        avg = (avg * iterations + t0.elapsed()) / (iterations + 1);
-        iterations += 1;
-
-        if iterations % 100 == 0 {
-            println!("{:?}", avg);
-        }
+        print!("{:?}", t0.elapsed());
+        print!("\r");
 
         match renderer.display() {
             Err(e) => {

@@ -3,161 +3,88 @@ use crate::graphics_primitives::*;
 use crate::math::*;
 use crate::uniform::*;
 
+mod bounding_box;
+mod buffers;
+
+use crate::rasterizer::bounding_box::*;
+use crate::rasterizer::buffers::*;
+
 use std::f32;
 
-#[derive(Debug)]
-struct PixelBoundingBox {
-    pub min_x: usize,
-    pub max_x: usize,
-    pub min_y: usize,
-    pub max_y: usize,
+fn triangle_2x_area<CS: CoordinateSystem, const N: usize>(vertices: &[Point<CS, { N }>]) -> f32 {
+    let v10 = vertices[1].xy() - vertices[0].xy();
+    let v20 = vertices[2].xy() - vertices[0].xy();
+    v10.cross(v20)
 }
 
-impl From<&[Point2D; 3]> for PixelBoundingBox {
-    fn from(vertices: &[Point2D; 3]) -> Self {
-        let vals = vertices
-            .iter()
-            .fold((f32::MAX, f32::MIN, f32::MAX, f32::MIN), |a, p| {
-                (
-                    a.0.min(p.x()),
-                    a.1.max(p.x()),
-                    a.2.min(p.y()),
-                    a.3.max(p.y()),
-                )
-            });
-        // Convert the min/max bounds into pixel coordinates. Always round
-        // away from the center of the box.
-        let (min_x, max_x, min_y, max_y) = (
-            vals.0.floor() as usize,
-            vals.1.ceil() as usize,
-            vals.2.floor() as usize,
-            vals.3.ceil() as usize,
-        );
-        debug_assert!(min_x < max_x, "{} < {}", min_x, max_x);
-        debug_assert!(min_y < max_y, "{} < {}", min_y, max_y);
-        Self {
-            min_x,
-            max_x,
-            min_y,
-            max_y,
-        }
-    }
+const N_MSAA_SAMPLES: u8 = 4;
+
+#[derive(Copy, Clone, Debug)]
+pub struct CoverageMask {
+    mask: u8,
 }
 
-#[derive(Debug, Copy, Clone)]
-pub enum ColorBufferFormat {
-    RGBA,
-    BGRA,
-}
-
-#[derive(Debug)]
-pub struct ColorBuffer {
-    buffer: Vec<u32>,
-    width: usize,
-    height: usize,
-    format: ColorBufferFormat,
-}
-
-impl ColorBuffer {
-    pub fn new(width: usize, height: usize, format: ColorBufferFormat) -> Self {
-        let mut buffer = Vec::with_capacity(width * height);
-        // Initialize to black
-        for _i in 0..width * height {
-            buffer.push(0);
-        }
-        let mut ret = Self {
-            buffer,
-            width,
-            height,
-            format,
-        };
-
-        ret.clear();
-        ret
+impl CoverageMask {
+    const fn len() -> u8 {
+        N_MSAA_SAMPLES
+    }
+    fn new() -> Self {
+        CoverageMask { mask: 0u8 }
     }
 
-    // Clear to dark grey
-    fn clear(&mut self) {
-        debug_assert_eq!(self.buffer.len(), self.height * self.width);
-        for i in 0..self.width {
-            for j in 0..self.height {
-                self.set_pixel(
-                    i,
-                    j,
-                    Color {
-                        r: 0.1,
-                        g: 0.1,
-                        b: 0.1,
-                        a: 1.0,
-                    },
-                );
-            }
-        }
+    fn any(&self) -> bool {
+        self.mask != 0
     }
 
-    fn set_pixel(&mut self, row: usize, col: usize, color: Color) {
-        match self.format {
-            ColorBufferFormat::BGRA => self.buffer[row * self.width + col] = color.to_bgra(),
-            ColorBufferFormat::RGBA => self.buffer[row * self.width + col] = color.to_rgba(),
-        }
+    fn all(&self) -> bool {
+        self.mask == 0b1111
     }
 
-    pub fn get_raw(&self) -> &Vec<u32> {
-        &self.buffer
-    }
-}
-
-#[derive(Debug)]
-pub struct DepthBuffer {
-    buffer: Vec<f32>,
-    width: usize,
-    height: usize,
-}
-
-impl DepthBuffer {
-    pub fn new(width: usize, height: usize) -> Self {
-        let mut buffer = Vec::with_capacity(width * height);
-        // Initialize to max depth => everything will be in front
-        for _i in 0..width * height {
-            buffer.push(f32::MAX);
-        }
-        Self {
-            buffer,
-            width,
-            height,
-        }
+    fn empty(&self) -> bool {
+        self.mask == 0
     }
 
-    fn clear(&mut self) {
-        debug_assert_eq!(self.buffer.len(), self.height * self.width);
-        for i in 0..self.width * self.height {
-            self.buffer[i] = f32::MAX;
-        }
+    fn get(&self, i: u8) -> bool {
+        debug_assert!(i < N_MSAA_SAMPLES);
+        ((1 << i) & self.mask) != 0
     }
 
-    fn get_depth(&self, row: usize, col: usize) -> f32 {
-        self.buffer[row * self.width + col]
-    }
-
-    fn set_depth(&mut self, row: usize, col: usize, depth: f32) {
-        debug_assert!(depth >= 0.0 && depth <= 1.0, "Invalid depth: {}", depth);
-        self.buffer[row * self.width + col] = depth;
+    fn set(&mut self, i: u8, v: bool) {
+        debug_assert!(i < N_MSAA_SAMPLES);
+        let v = if v { 1 } else { 0 };
+        self.mask = (self.mask & (!(1 << i))) | (v << i);
     }
 }
 
 struct Fragment<'a> {
-    pub depth: f32,
-    edge_functions: &'a [f32; 3],
+    sampled_depths: [f32; N_MSAA_SAMPLES as usize],
+    edge_functions: &'a EdgeFunctions,
     depths_camera_space: &'a [f32; 3],
     triangle_attributes: &'a [VertexAttribute; 3],
 }
 
 impl<'a> Fragment<'a> {
-    fn interpolate(&self) -> VertexAttribute {
+    fn interpolate(&self, x: usize, y: usize, cov: CoverageMask) -> VertexAttribute {
+        let mut x_sample = x as f32 + 0.5;
+        let mut y_sample = y as f32 + 0.5;
+
+        // We have to sample inside the triangle
+        if !cov.all() {
+            for i in 0..N_MSAA_SAMPLES {
+                if cov.get(i) {
+                    x_sample = x as f32 + RGSS_SAMPLE_PATTERN[i as usize][0];
+                    y_sample = y as f32 + RGSS_SAMPLE_PATTERN[i as usize][1];
+                    break;
+                }
+            }
+        }
+
+        let efs = self.edge_functions.eval_single(x_sample, y_sample);
+
         // Perspective correct barycentrics.
-        let f_u = self.edge_functions[1] / self.depths_camera_space[0];
-        let f_v = self.edge_functions[2] / self.depths_camera_space[1];
-        let f_w = self.edge_functions[0] / self.depths_camera_space[2];
+        let f_u = efs[1] / self.depths_camera_space[0];
+        let f_v = efs[2] / self.depths_camera_space[1];
+        let f_w = efs[0] / self.depths_camera_space[2];
         let sum = f_u + f_v + f_w;
         let u = clamp_bary(f_u / sum);
         let v = clamp_bary(f_v / sum);
@@ -170,38 +97,64 @@ impl<'a> Fragment<'a> {
 }
 
 fn clamp_bary(x: f32) -> f32 {
-    const EPS: f32 = 0.0005;
+    const EPS: f32 = 0.0001;
     debug_assert!(x >= 0.0 - EPS && x <= 1.0 + EPS, "{}", x);
     x.clamp(0.0, 1.0)
 }
+
+// Rotated grid super sampling
+const RGSS_SAMPLE_PATTERN: [[f32; 2]; N_MSAA_SAMPLES as usize] = [
+    [5.0 / 8.0, 1.0 / 8.0],
+    [7.0 / 8.0, 5.0 / 8.0],
+    [3.0 / 8.0, 7.0 / 8.0],
+    [1.0 / 8.0, 3.0 / 8.0],
+];
 
 #[derive(Debug, Clone)]
 struct EdgeFunctions {
     points: [Point2D; 3],
     normals: [Vec2; 3],
-    evaluated: [f32; 3],
+    coverage_evaluated: [[f32; 3]; N_MSAA_SAMPLES as usize],
+    coverage_mask: CoverageMask,
 }
 
 impl EdgeFunctions {
-    fn eval(&mut self, x: f32, y: f32) {
+    fn eval_single(&self, x: f32, y: f32) -> [f32; 3] {
         let p = Point2D::new(x, y);
-        self.evaluated = [
+        [
             self.normals[0].dot(p - self.points[0]),
             self.normals[1].dot(p - self.points[1]),
             self.normals[2].dot(p - self.points[2]),
-        ];
+        ]
     }
 
-    fn step_x(&mut self) {
-        for i in 0..self.evaluated.len() {
-            self.evaluated[i] += self.normals[i].x();
+    fn eval(&mut self, x: usize, y: usize) {
+        for i in 0..N_MSAA_SAMPLES {
+            let x_sample = x as f32 + RGSS_SAMPLE_PATTERN[i as usize][0];
+            let y_sample = y as f32 + RGSS_SAMPLE_PATTERN[i as usize][1];
+
+            self.coverage_evaluated[i as usize] = self.eval_single(x_sample, y_sample);
+
+            self.coverage_mask.set(
+                i,
+                EdgeFunctions::inside(&self.normals, &self.coverage_evaluated[i as usize]),
+            );
         }
     }
 
-    fn inside(&self) -> bool {
-        self.evaluated
+    /*
+        fn step_x(&mut self) {
+            for i in 0..self.coverage_evaluated.len() {
+                for j in 0..3 {
+                    self.coverage_evaluated[i][j] += self.normals[j].x();
+                }
+            }
+        }
+    */
+    fn inside(normals: &[Vec2; 3], eval_edge_funcs: &[f32; 3]) -> bool {
+        eval_edge_funcs
             .iter()
-            .zip(self.normals.iter())
+            .zip(normals.iter())
             .all(|(val, normal)| {
                 if *val > 0.0 {
                     return true;
@@ -221,14 +174,11 @@ impl EdgeFunctions {
                 return false;
             })
     }
-}
 
-fn triangle_2x_area<CS: CoordinateSystem, const N: usize>(vertices: &[Point<CS, { N }>]) -> f32 {
-    let v10 = vertices[1].xy() - vertices[0].xy();
-    let v20 = vertices[2].xy() - vertices[0].xy();
-    v10.cross(v20)
+    fn any_coverage(&self) -> bool {
+        self.coverage_mask.any()
+    }
 }
-
 const CULL_DEGENERATE_TRIANGLE_AREA_EPS: f32 = 0.000001;
 
 // Implicitly in 2D Screen space
@@ -266,7 +216,8 @@ impl RasterizerTriangle {
         let edge_functions = EdgeFunctions {
             points: [vertices[0].xy(), vertices[1].xy(), vertices[2].xy()],
             normals: [n0, n1, n2],
-            evaluated: [0.0, 0.0, 0.0],
+            coverage_evaluated: [[0.0; 3]; N_MSAA_SAMPLES as usize],
+            coverage_mask: CoverageMask::new(),
         };
 
         Self {
@@ -278,34 +229,32 @@ impl RasterizerTriangle {
         }
     }
 
-    fn eval_edge_functions(&mut self, x: f32, y: f32) {
-        self.edge_functions.eval(x, y);
-    }
-
-    fn step_edge_func_x(&mut self) {
-        self.edge_functions.step_x();
-    }
-
-    fn inside(&self) -> bool {
-        self.edge_functions.inside()
-    }
-
     // See realtime rendering on details
     fn fragment<'a>(&'a self) -> Fragment<'a> {
-        let edge_functions = &self.edge_functions.evaluated;
-        // Linear barycentrics, used only for interpolating z
-        let bary0 = clamp_bary(edge_functions[1] * self.inv_2x_area);
-        let bary1 = clamp_bary(edge_functions[2] * self.inv_2x_area);
-        let bary2 = clamp_bary(1.0 - bary0 - bary1);
+        let interpolate_depth = |edge_functions: &[f32; 3]| -> f32 {
+            // Linear barycentrics, used only for interpolating z
+            let bary0 = clamp_bary(edge_functions[1] * self.inv_2x_area);
+            let bary1 = clamp_bary(edge_functions[2] * self.inv_2x_area);
+            let bary2 = clamp_bary(1.0 - bary0 - bary1);
 
-        // z here is in NDC and in that transform it was divided by w (camera space depth) which
-        // means we can interpolate it with the linear barycentrics. For attributes, we need
-        // perspective correct barycentrics
-        let depth = bary0 * self.depths[0] + bary1 * self.depths[1] + bary2 * self.depths[2];
+            // z here is in NDC and in that transform it was divided by w (camera space depth) which
+            // means we can interpolate it with the linear barycentrics. For attributes, we need
+            // perspective correct barycentrics
+            bary0 * self.depths[0] + bary1 * self.depths[1] + bary2 * self.depths[2]
+        };
+
+        let mut sampled_depths = [0.0; N_MSAA_SAMPLES as usize];
+
+        for i in 0..N_MSAA_SAMPLES {
+            if self.edge_functions.coverage_mask.get(i) {
+                sampled_depths[i as usize] =
+                    interpolate_depth(&self.edge_functions.coverage_evaluated[i as usize]);
+            }
+        }
 
         Fragment {
-            depth,
-            edge_functions,
+            sampled_depths,
+            edge_functions: &self.edge_functions,
             depths_camera_space: &self.depths_camera_space,
             triangle_attributes: &self.attributes,
         }
@@ -316,7 +265,8 @@ pub struct FragCoords {
     // x,y are screen space
     pub x: f32,
     pub y: f32,
-    pub depth: f32,
+    pub depths: [f32; 4],
+    pub mask: CoverageMask,
 }
 
 pub struct Rasterizer {
@@ -330,8 +280,8 @@ pub struct Rasterizer {
 impl Rasterizer {
     pub fn new(width: usize, height: usize) -> Self {
         let color_buffers = [
-            ColorBuffer::new(width, height, ColorBufferFormat::BGRA),
-            ColorBuffer::new(width, height, ColorBufferFormat::BGRA),
+            ColorBuffer::new(width, height),
+            ColorBuffer::new(width, height),
         ];
 
         let depth_buffers = [
@@ -412,13 +362,37 @@ impl Rasterizer {
         RasterizerTriangle::new(vertices, depths, tri.vertex_attributes)
     }
 
-    fn query_depth(&self, row: usize, col: usize) -> f32 {
-        self.depth_buffers[self.buf_idx].get_depth(row, col)
+    fn depth_coverage(
+        &self,
+        row: usize,
+        col: usize,
+        cov: CoverageMask,
+        sampled_depths: &[f32; N_MSAA_SAMPLES as usize],
+    ) -> CoverageMask {
+        let cur_depths = self.depth_buffers[self.buf_idx].get_depth(row, col);
+        let mut depth_cov = CoverageMask::new();
+        for i in 0..N_MSAA_SAMPLES {
+            if cov.get(i) {
+                depth_cov.set(i, sampled_depths[i as usize] < cur_depths[i as usize]);
+            }
+        }
+        depth_cov
     }
 
-    fn write_pixel(&mut self, row: usize, col: usize, color: Color, depth: f32) {
-        self.color_buffers[self.buf_idx].set_pixel(row, col, color);
-        self.depth_buffers[self.buf_idx].set_depth(row, col, depth);
+    fn write_pixel(
+        &mut self,
+        row: usize,
+        col: usize,
+        color: Color,
+        depths: &[f32; N_MSAA_SAMPLES as usize],
+        cov_mask: CoverageMask,
+    ) {
+        for i in 0..N_MSAA_SAMPLES {
+            if cov_mask.get(i) {
+                self.color_buffers[self.buf_idx].set_pixel(row, col, color, i);
+                self.depth_buffers[self.buf_idx].set_depth(row, col, depths[i as usize], i);
+            }
+        }
     }
 
     fn can_cull(vertices: &[Point4D<ClipSpace>]) -> bool {
@@ -442,36 +416,43 @@ impl Rasterizer {
             let mut triangle = self.viewport_transform(triangle);
             let b_box = PixelBoundingBox::from(&triangle.edge_functions.points);
             for i in b_box.min_y..b_box.max_y {
-                triangle.eval_edge_functions(b_box.min_x as f32 + 0.5, i as f32 + 0.5);
                 for j in b_box.min_x..b_box.max_x {
-                    // Sample middle of pixel
-                    if triangle.inside() {
+                    triangle.edge_functions.eval(j, i);
+                    if triangle.edge_functions.any_coverage() {
                         let fragment = triangle.fragment();
-                        if self.query_depth(i, j) < fragment.depth {
+                        let cov_mask = self.depth_coverage(
+                            i,
+                            j,
+                            triangle.edge_functions.coverage_mask,
+                            &fragment.sampled_depths,
+                        );
+                        if cov_mask.empty() {
                             continue;
                         }
 
                         let fc = FragCoords {
                             x: j as f32 + 0.5,
                             y: i as f32 + 0.5,
-                            depth: fragment.depth,
+                            depths: fragment.sampled_depths,
+                            mask: fragment.edge_functions.coverage_mask,
                         };
 
-                        let col = fragment_shader(uniforms, &fc, &fragment.interpolate());
-                        self.write_pixel(i, j, col, fragment.depth);
+                        let col =
+                            fragment_shader(uniforms, &fc, &fragment.interpolate(j, i, cov_mask));
+                        self.write_pixel(i, j, col, &fragment.sampled_depths, cov_mask);
                     }
-                    triangle.step_edge_func_x();
+                    //triangle.edge_functions.step_x();
                 }
             }
         }
     }
 
-    pub fn swap_buffers(&mut self) -> &ColorBuffer {
+    pub fn swap_buffers(&mut self) -> &[u32] {
         let prev = self.buf_idx;
         self.buf_idx = (self.buf_idx + 1) % 2;
         self.depth_buffers[self.buf_idx].clear();
         self.color_buffers[self.buf_idx].clear();
-        &self.color_buffers[prev]
+        self.color_buffers[prev].resolve()
     }
 }
 
@@ -561,35 +542,6 @@ mod tests {
         for i in 0..expected.len() {
             assert_eq!(tri_ndc.vertices[i], expected[i]);
         }
-    }
-
-    #[test]
-    fn bounding_box() {
-        let points = [
-            Point2D::new(100.0, 200.0),
-            Point2D::new(230.0, 200.0),
-            Point2D::new(230.0, 300.0),
-        ];
-
-        let bb = PixelBoundingBox::from(&points);
-
-        assert_eq!(bb.min_x, 100);
-        assert_eq!(bb.max_x, 230);
-        assert_eq!(bb.min_y, 200);
-        assert_eq!(bb.max_y, 300);
-
-        let points = [
-            Point2D::new(50.9, 200.0),
-            Point2D::new(230.0, 100.0),
-            Point2D::new(500.0, 200.9),
-        ];
-
-        let bb = PixelBoundingBox::from(&points);
-
-        assert_eq!(bb.min_x, 50);
-        assert_eq!(bb.max_x, 500);
-        assert_eq!(bb.min_y, 100);
-        assert_eq!(bb.max_y, 201);
     }
 
     #[test]
@@ -688,17 +640,60 @@ mod tests {
     }
 
     #[test]
-    fn edge_functions() {
-        const WIDTH: usize = 400;
-        const HEIGHT: usize = 600;
+    fn coverage_mask() {
+        let mut m = CoverageMask::new();
+        assert!(m.empty());
+        assert!(!m.any());
 
-        let rasterizer = Rasterizer::new(WIDTH, HEIGHT);
+        m.set(0, true);
+        assert!(!m.empty());
+        assert!(m.any());
+        assert!(m.get(0));
+        assert!(!m.get(1));
+        assert!(!m.get(2));
+        assert!(!m.get(3));
 
+        m.set(2, true);
+        assert!(m.get(0));
+        assert!(!m.get(1));
+        assert!(m.get(2));
+        assert!(!m.get(3));
+        assert!(m.any());
+        assert!(!m.empty());
+
+        m.set(3, false);
+        assert!(m.get(0));
+        assert!(!m.get(1));
+        assert!(m.get(2));
+        assert!(!m.get(3));
+        assert!(m.any());
+        assert!(!m.empty());
+
+        m.set(0, false);
+        assert!(!m.get(0));
+        assert!(!m.get(1));
+        assert!(m.get(2));
+        assert!(!m.get(3));
+        assert!(m.any());
+        assert!(!m.empty());
+
+        m.set(2, false);
+        assert!(!m.get(0));
+        assert!(!m.get(1));
+        assert!(!m.get(2));
+        assert!(!m.get(3));
+        assert!(!m.any());
+        assert!(m.empty());
+    }
+
+    fn setup_rasterizer_triangle() -> RasterizerTriangle {
         let vertices = [
-            Point4D::<NDC>::new(-0.5, 0.0, 0.0, 5.0),
-            Point4D::<NDC>::new(0.0, 0.5, 0.0, 6.0),
-            Point4D::<NDC>::new(0.5, 0.0, 0.0, 7.0),
+            Point3D::<ScreenSpace>::new(100.0, 300.0, 0.5),
+            Point3D::<ScreenSpace>::new(200.0, 150.0, 0.5),
+            Point3D::<ScreenSpace>::new(300.0, 300.0, 0.5),
         ];
+
+        let depths = [5.0, 6.0, 7.0];
 
         let vertex_attributes = [
             (Color::red(), [0.0, 0.0]).into(),
@@ -706,12 +701,12 @@ mod tests {
             (Color::red(), [0.0, 0.0]).into(),
         ];
 
-        let tri = Triangle::<NDC> {
-            vertices,
-            vertex_attributes,
-        };
+        RasterizerTriangle::new(vertices, depths, vertex_attributes)
+    }
 
-        let mut rast_tri = rasterizer.viewport_transform(tri);
+    #[test]
+    fn edge_functions_basic() {
+        let mut rast_tri = setup_rasterizer_triangle();
 
         assert_eq!(
             rast_tri.edge_functions.points[0],
@@ -727,39 +722,151 @@ mod tests {
             Point2D::new(300.0, 300.0)
         );
 
-        rast_tri.eval_edge_functions(200.0, 200.0);
-        assert!(rast_tri.inside());
+        rast_tri.edge_functions.eval(200, 200);
+        assert!(rast_tri.edge_functions.any_coverage());
+        assert_eq!(rast_tri.edge_functions.coverage_mask.mask, 0b1111);
 
-        rast_tri.eval_edge_functions(99.0, 299.0);
-        assert!(!rast_tri.inside());
-        rast_tri.eval_edge_functions(101.0, 299.0);
-        assert!(rast_tri.inside());
+        rast_tri.edge_functions.eval(99, 299);
+        assert!(!rast_tri.edge_functions.any_coverage());
+        assert_eq!(rast_tri.edge_functions.coverage_mask.mask, 0);
 
-        rast_tri.eval_edge_functions(200.0, 149.0);
-        assert!(!rast_tri.inside());
-        rast_tri.eval_edge_functions(200.0, 151.0);
-        assert!(rast_tri.inside());
+        rast_tri.edge_functions.eval(101, 299);
+        assert!(rast_tri.edge_functions.any_coverage());
+        assert_eq!(rast_tri.edge_functions.coverage_mask.mask, 0b1111);
 
-        rast_tri.eval_edge_functions(301.0, 300.0);
-        assert!(!rast_tri.inside());
-        rast_tri.eval_edge_functions(299.0, 299.0);
-        assert!(rast_tri.inside());
+        rast_tri.edge_functions.eval(200, 149);
+        assert!(!rast_tri.edge_functions.any_coverage());
+        assert_eq!(rast_tri.edge_functions.coverage_mask.mask, 0);
+        rast_tri.edge_functions.eval(200, 151);
+        assert!(rast_tri.edge_functions.any_coverage());
+        assert_eq!(rast_tri.edge_functions.coverage_mask.mask, 0b1111);
+
+        rast_tri.edge_functions.eval(301, 300);
+        assert!(!rast_tri.edge_functions.any_coverage());
+        assert_eq!(rast_tri.edge_functions.coverage_mask.mask, 0);
+    }
+
+    #[test]
+    fn edge_functions_partial() {
+        let mut rast_tri = setup_rasterizer_triangle();
+
+        rast_tri.edge_functions.eval(299, 299);
+        assert!(rast_tri.edge_functions.any_coverage());
+        assert_eq!(rast_tri.edge_functions.coverage_mask.mask, 0b1100);
+
+        rast_tri.edge_functions.eval(150, 224);
+        assert!(rast_tri.edge_functions.any_coverage());
+        assert_eq!(rast_tri.edge_functions.coverage_mask.mask, 0b0111);
+
+        rast_tri.edge_functions.eval(250, 225);
+        assert!(rast_tri.edge_functions.any_coverage());
+        assert_eq!(rast_tri.edge_functions.coverage_mask.mask, 0b1100);
+    }
+
+    #[test]
+    fn edge_functions_tie_breaker() {
+        let mut rast_tri = setup_rasterizer_triangle();
 
         // Testing the tie-breaker rules.
-        rast_tri.eval_edge_functions(150.0, 225.0);
-        assert!(rast_tri.inside());
-        assert_eq!(rast_tri.edge_functions.evaluated[0], 0.0);
+        let e = rast_tri.edge_functions.eval_single(150.0, 225.0);
+        assert!(EdgeFunctions::inside(&rast_tri.edge_functions.normals, &e));
+        assert_eq!(e[0], 0.0);
         assert_eq!(rast_tri.edge_functions.normals[0].x() > 0.0, true);
 
-        rast_tri.eval_edge_functions(250.0, 225.0);
-        assert!(!rast_tri.inside());
-        assert_eq!(rast_tri.edge_functions.evaluated[1], 0.0);
+        let e = rast_tri.edge_functions.eval_single(250.0, 225.0);
+        assert!(!EdgeFunctions::inside(&rast_tri.edge_functions.normals, &e));
+        assert_eq!(e[1], 0.0);
         assert_eq!(rast_tri.edge_functions.normals[1].x() < 0.0, true);
 
-        rast_tri.eval_edge_functions(250.0, 300.0);
-        assert!(rast_tri.inside());
-        assert_eq!(rast_tri.edge_functions.evaluated[2], 0.0);
+        let e = rast_tri.edge_functions.eval_single(250.0, 300.0);
+        assert!(EdgeFunctions::inside(&rast_tri.edge_functions.normals, &e));
+        assert_eq!(e[2], 0.0);
         assert_eq!(rast_tri.edge_functions.normals[2].x() == 0.0, true);
         assert_eq!(rast_tri.edge_functions.normals[2].y() < 0.0, true);
     }
+
+    /*
+    #[test]
+    fn edge_functions_pathological() {
+        let vertices = [
+            Point3D::<ScreenSpace>::new(355.555573, 355.555542,0.781686246),
+            Point3D::<ScreenSpace>::new(444.444427, 355.555542, 0.781686187),
+            Point3D::<ScreenSpace>::new(444.444427, 444.444458, 0.781686187),
+        ];
+
+        let depths = [4.5, 4.5, 4.5];
+
+        let vertex_attributes = [
+            (Color::red(), [0.0, 0.0]).into(),
+            (Color::red(), [0.0, 0.0]).into(),
+            (Color::red(), [0.0, 0.0]).into(),
+        ];
+
+        let mut rast_tri = RasterizerTriangle::new(
+            vertices,
+            depths,
+            vertex_attributes,
+        );
+
+        rast_tri.edge_functions.eval(355, 355);
+        for i in 0..89 {
+            rast_tri.edge_functions.step_x();
+        }
+
+        assert!(rast_tri.edge_functions.any_coverage());
+        assert_eq!(rast_tri.edge_functions.coverage_mask.mask, 0b0010);
+
+        let f = rast_tri.fragment();
+    }
+
+
+    #[test]
+    fn edge_functions_step_x() {
+        let vertices = [
+            Point3D::<ScreenSpace>::new(355.555573, 355.555542,0.781686246),
+            Point3D::<ScreenSpace>::new(444.444427, 355.555542, 0.781686187),
+            Point3D::<ScreenSpace>::new(444.444427, 444.444458, 0.781686187),
+        ];
+
+        let depths = [4.5, 4.5, 4.5];
+
+        let vertex_attributes = [
+            (Color::red(), [0.0, 0.0]).into(),
+            (Color::red(), [0.0, 0.0]).into(),
+            (Color::red(), [0.0, 0.0]).into(),
+        ];
+
+        let mut tri0 = RasterizerTriangle::new(
+            vertices,
+            depths,
+            vertex_attributes,
+        );
+
+        let mut tri1 = tri0.clone();
+
+
+
+        let verify_eq = |a: &[[f32; 3]; N_MSAA_SAMPLES as usize], b: &[[f32; 3]; N_MSAA_SAMPLES as usize]| {
+            let eps: f32 = 0.001;
+            for i in 0..a.len() {
+                for j in 0..3 {
+                    assert!((a[i][j] - b[i][j]).abs() < eps);
+                }
+            }
+        };
+
+
+        tri0.edge_functions.eval(355, 355);
+        for i in 0..89 {
+            tri1.edge_functions.eval(355 + i, 355);
+
+            let a = tri0.edge_functions.coverage_evaluated;
+            let b = tri1.edge_functions.coverage_evaluated;
+            verify_eq(&a, &b);
+
+            tri0.edge_functions.step_x();
+        }
+    }
+
+    */
 }
