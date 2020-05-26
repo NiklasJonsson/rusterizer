@@ -774,4 +774,100 @@ mod tests {
         assert_eq!(rast_tri.edge_functions.normals[2].x() == 0.0, true);
         assert_eq!(rast_tri.edge_functions.normals[2].y() < 0.0, true);
     }
+
+    #[test]
+    fn fragment_creation_same_depth() {
+        let mut rast_tri = setup_rasterizer_triangle();
+
+        rast_tri.edge_functions.eval(200, 200);
+
+        let fragment = rast_tri.fragment();
+        assert_eq!(fragment.sampled_depths, [0.5; 4]);
+    }
+
+    #[test]
+    fn fragment_creation_same_depth_partial_coverage() {
+        let mut rast_tri = setup_rasterizer_triangle();
+        rast_tri.edge_functions.eval(299, 299);
+
+        let fragment = rast_tri.fragment();
+        assert_eq!(fragment.sampled_depths, [0.0, 0.0, 0.5, 0.5]);
+    }
+
+    #[test]
+    fn fragment_creation_interp_depth() {
+        let vertices = [
+            Point3D::<ScreenSpace>::new(100.0, 300.0, 0.5),
+            Point3D::<ScreenSpace>::new(200.0, 150.0, 0.3),
+            Point3D::<ScreenSpace>::new(300.0, 300.0, 0.8),
+        ];
+
+        // Not important atm, so can be anything
+        let depths = [5.0, 6.0, 7.0];
+
+        let vertex_attributes = [
+            (Color::red(), [0.0, 0.0]).into(),
+            (Color::red(), [0.0, 0.0]).into(),
+            (Color::red(), [0.0, 0.0]).into(),
+        ];
+
+        let mut rast_tri = RasterizerTriangle::new(vertices, depths, vertex_attributes);
+
+        rast_tri.edge_functions.eval(101, 299);
+        let fragment = rast_tri.fragment();
+        // This is expected to be very close to the attribute
+        assert_eq!(fragment.sampled_depths, [0.50039583, 0.5019375, 0.50177085, 0.5002292]);
+
+        rast_tri.edge_functions.eval(200, 151);
+        let fragment = rast_tri.fragment();
+        // This is expected to be very close to the attribute
+        assert_eq!(fragment.sampled_depths, [0.30356252, 0.30510417, 0.3049375, 0.30339584]);
+
+        rast_tri.edge_functions.eval(298, 299);
+        let fragment = rast_tri.fragment();
+        // This is expected to be very close to the attribute
+        assert_eq!(fragment.sampled_depths, [0.7958958, 0.79743755, 0.79727083, 0.79572916]);
+
+        // Sample in the middle
+        rast_tri.edge_functions.eval(200, 258);
+        let fragment = rast_tri.fragment();
+        assert_eq!(fragment.sampled_depths, [0.55322915, 0.5547708, 0.5546042, 0.55306244]);
+
+    }
+
+    fn verify_uvs_at(rast_tri: &mut RasterizerTriangle, x: usize, y: usize, expected: &[f32; 2]) {
+        rast_tri.edge_functions.eval(x, y);
+        let fragment = rast_tri.fragment();
+        let attrs = fragment.interpolate(x, y, rast_tri.edge_functions.coverage_mask);
+        assert_eq!(&attrs.uvs, expected);
+    }
+
+    #[test]
+    fn fragment_creation_interp_attr_same_depth() {
+        // These depths are not used for attribute interpolation
+        let vertices = [
+            Point3D::<ScreenSpace>::new(100.0, 300.0, 0.5),
+            Point3D::<ScreenSpace>::new(200.0, 150.0, 0.5),
+            Point3D::<ScreenSpace>::new(300.0, 300.0, 0.5),
+        ];
+
+        // These are used for interpolation
+        let depths = [5.0, 5.0, 5.0];
+
+        let vertex_attributes = [
+            (Color::red(), [0.0, 0.0]).into(),
+            (Color::red(), [0.0, 1.0]).into(),
+            (Color::red(), [1.0, 1.0]).into(),
+        ];
+
+        let mut rast_tri = RasterizerTriangle::new(vertices, depths, vertex_attributes);
+
+        // This is expected to be very close to the attribute
+        verify_uvs_at(&mut rast_tri, 100, 299, &[0.00020831265, 0.006041646]);
+        verify_uvs_at(&mut rast_tri, 200, 150, &[0.004791677, 0.99895835]);
+        verify_uvs_at(&mut rast_tri, 299, 299, &[0.99645835, 0.9972917]);
+
+        // Sample in the middle
+        verify_uvs_at(&mut rast_tri, 200, 258, &[0.3641667, 0.6408334]);
+    }
 }
