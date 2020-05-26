@@ -142,15 +142,6 @@ impl EdgeFunctions {
         }
     }
 
-    /*
-        fn step_x(&mut self) {
-            for i in 0..self.coverage_evaluated.len() {
-                for j in 0..3 {
-                    self.coverage_evaluated[i][j] += self.normals[j].x();
-                }
-            }
-        }
-    */
     fn inside(normals: &[Vec2; 3], eval_edge_funcs: &[f32; 3]) -> bool {
         eval_edge_funcs
             .iter()
@@ -441,7 +432,6 @@ impl Rasterizer {
                             fragment_shader(uniforms, &fc, &fragment.interpolate(j, i, cov_mask));
                         self.write_pixel(i, j, col, &fragment.sampled_depths, cov_mask);
                     }
-                    //triangle.edge_functions.step_x();
                 }
             }
         }
@@ -784,89 +774,4 @@ mod tests {
         assert_eq!(rast_tri.edge_functions.normals[2].x() == 0.0, true);
         assert_eq!(rast_tri.edge_functions.normals[2].y() < 0.0, true);
     }
-
-    /*
-    #[test]
-    fn edge_functions_pathological() {
-        let vertices = [
-            Point3D::<ScreenSpace>::new(355.555573, 355.555542,0.781686246),
-            Point3D::<ScreenSpace>::new(444.444427, 355.555542, 0.781686187),
-            Point3D::<ScreenSpace>::new(444.444427, 444.444458, 0.781686187),
-        ];
-
-        let depths = [4.5, 4.5, 4.5];
-
-        let vertex_attributes = [
-            (Color::red(), [0.0, 0.0]).into(),
-            (Color::red(), [0.0, 0.0]).into(),
-            (Color::red(), [0.0, 0.0]).into(),
-        ];
-
-        let mut rast_tri = RasterizerTriangle::new(
-            vertices,
-            depths,
-            vertex_attributes,
-        );
-
-        rast_tri.edge_functions.eval(355, 355);
-        for i in 0..89 {
-            rast_tri.edge_functions.step_x();
-        }
-
-        assert!(rast_tri.edge_functions.any_coverage());
-        assert_eq!(rast_tri.edge_functions.coverage_mask.mask, 0b0010);
-
-        let f = rast_tri.fragment();
-    }
-
-
-    #[test]
-    fn edge_functions_step_x() {
-        let vertices = [
-            Point3D::<ScreenSpace>::new(355.555573, 355.555542,0.781686246),
-            Point3D::<ScreenSpace>::new(444.444427, 355.555542, 0.781686187),
-            Point3D::<ScreenSpace>::new(444.444427, 444.444458, 0.781686187),
-        ];
-
-        let depths = [4.5, 4.5, 4.5];
-
-        let vertex_attributes = [
-            (Color::red(), [0.0, 0.0]).into(),
-            (Color::red(), [0.0, 0.0]).into(),
-            (Color::red(), [0.0, 0.0]).into(),
-        ];
-
-        let mut tri0 = RasterizerTriangle::new(
-            vertices,
-            depths,
-            vertex_attributes,
-        );
-
-        let mut tri1 = tri0.clone();
-
-
-
-        let verify_eq = |a: &[[f32; 3]; N_MSAA_SAMPLES as usize], b: &[[f32; 3]; N_MSAA_SAMPLES as usize]| {
-            let eps: f32 = 0.001;
-            for i in 0..a.len() {
-                for j in 0..3 {
-                    assert!((a[i][j] - b[i][j]).abs() < eps);
-                }
-            }
-        };
-
-
-        tri0.edge_functions.eval(355, 355);
-        for i in 0..89 {
-            tri1.edge_functions.eval(355 + i, 355);
-
-            let a = tri0.edge_functions.coverage_evaluated;
-            let b = tri1.edge_functions.coverage_evaluated;
-            verify_eq(&a, &b);
-
-            tri0.edge_functions.step_x();
-        }
-    }
-
-    */
 }
