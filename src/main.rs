@@ -114,7 +114,6 @@ fn main() {
         }
 
         print!("{:?}", t0.elapsed());
-        print!("\r");
 
         match renderer.display() {
             Err(e) => {
