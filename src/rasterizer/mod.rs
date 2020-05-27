@@ -755,7 +755,7 @@ mod tests {
 
     #[test]
     fn edge_functions_tie_breaker() {
-        let mut rast_tri = setup_rasterizer_triangle();
+        let rast_tri = setup_rasterizer_triangle();
 
         // Testing the tie-breaker rules.
         let e = rast_tri.edge_functions.eval_single(150.0, 225.0);
@@ -816,23 +816,34 @@ mod tests {
         rast_tri.edge_functions.eval(101, 299);
         let fragment = rast_tri.fragment();
         // This is expected to be very close to the attribute
-        assert_eq!(fragment.sampled_depths, [0.50039583, 0.5019375, 0.50177085, 0.5002292]);
+        assert_eq!(
+            fragment.sampled_depths,
+            [0.50039583, 0.5019375, 0.50177085, 0.5002292]
+        );
 
         rast_tri.edge_functions.eval(200, 151);
         let fragment = rast_tri.fragment();
         // This is expected to be very close to the attribute
-        assert_eq!(fragment.sampled_depths, [0.30356252, 0.30510417, 0.3049375, 0.30339584]);
+        assert_eq!(
+            fragment.sampled_depths,
+            [0.30356252, 0.30510417, 0.3049375, 0.30339584]
+        );
 
         rast_tri.edge_functions.eval(298, 299);
         let fragment = rast_tri.fragment();
         // This is expected to be very close to the attribute
-        assert_eq!(fragment.sampled_depths, [0.7958958, 0.79743755, 0.79727083, 0.79572916]);
+        assert_eq!(
+            fragment.sampled_depths,
+            [0.7958958, 0.79743755, 0.79727083, 0.79572916]
+        );
 
         // Sample in the middle
         rast_tri.edge_functions.eval(200, 258);
         let fragment = rast_tri.fragment();
-        assert_eq!(fragment.sampled_depths, [0.55322915, 0.5547708, 0.5546042, 0.55306244]);
-
+        assert_eq!(
+            fragment.sampled_depths,
+            [0.55322915, 0.5547708, 0.5546042, 0.55306244]
+        );
     }
 
     fn verify_uvs_at(rast_tri: &mut RasterizerTriangle, x: usize, y: usize, expected: &[f32; 2]) {

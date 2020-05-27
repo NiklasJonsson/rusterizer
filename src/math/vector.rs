@@ -38,7 +38,7 @@ where
         self.arr.iter().fold(0.0, |acc, e| acc + e * e).sqrt()
     }
 
-    pub fn normalize(mut self) -> Self {
+    pub fn normalized(self) -> Self {
         self / self.len()
     }
 }
@@ -167,26 +167,26 @@ where
     }
 }
 
-pub type Vec2 = Vector<Any2D, { 2 }>;
+pub type Vec2 = Vector<Any2D, 2>;
 pub fn vec2(x: f32, y: f32) -> Vec2 {
-    Vector::<Any2D, { 2 }> {
+    Vector::<Any2D, 2> {
         arr: [x, y],
         coordinate_system: PhantomData {},
     }
 }
 
-impl<CS> Vector<CS, { 2 }>
+impl<CS> Vector<CS, 2>
 where
     CS: CoordinateSystem,
 {
-    pub fn cross(self, other: Vector<CS, { 2 }>) -> f32 {
+    pub fn cross(self, other: Vector<CS, 2>) -> f32 {
         self.x() * other.y() - other.x() * self.y()
     }
 }
 
-pub type Vec3<CS> = Vector<CS, { 3 }>;
+pub type Vec3<CS> = Vector<CS, 3>;
 pub fn vec3<CS: CoordinateSystem>(x: f32, y: f32, z: f32) -> Vec3<CS> {
-    Vector::<CS, { 3 }> {
+    Vector::<CS, 3> {
         arr: [x, y, z],
         coordinate_system: PhantomData {},
     }
@@ -207,7 +207,7 @@ impl<CS: CoordinateSystem> Vec3<CS> {
     }
 }
 
-pub type Vec4<CS> = Vector<CS, { 4 }>;
+pub type Vec4<CS> = Vector<CS, 4>;
 pub fn vec4<CS: CoordinateSystem>(x: f32, y: f32, z: f32, w: f32) -> Vec4<CS> {
     Vec4::<CS> {
         arr: [x, y, z, w],
@@ -272,20 +272,20 @@ mod tests {
     }
 
     #[test]
-    fn normalize() {
-        assert_eq!(vec3::<WorldSpace>(3.0, 10.760, 1.0).normalize().len(), 1.0);
-        assert_eq!(vec3::<WorldSpace>(8.0, 10.0, 1.0).normalize().len(), 1.0);
-        assert_eq!(vec3::<WorldSpace>(3.0, 143.5, 1.0).normalize().len(), 1.0);
+    fn normalized() {
+        assert_eq!(vec3::<WorldSpace>(3.0, 10.760, 1.0).normalized().len(), 1.0);
+        assert_eq!(vec3::<WorldSpace>(8.0, 10.0, 1.0).normalized().len(), 1.0);
+        assert_eq!(vec3::<WorldSpace>(3.0, 143.5, 1.0).normalized().len(), 1.0);
         assert_eq!(
-            vec3::<WorldSpace>(63.0, 2234.5, -1.0).normalize().len(),
+            vec3::<WorldSpace>(63.0, 2234.5, -1.0).normalized().len(),
             1.0
         );
         assert_eq!(
-            vec3::<WorldSpace>(23.0, -1546.1, 1324.0).normalize().len(),
+            vec3::<WorldSpace>(23.0, -1546.1, 1324.0).normalized().len(),
             1.0
         );
         assert_eq!(
-            vec3::<WorldSpace>(99.0, 14.0, -123.0).normalize().len(),
+            vec3::<WorldSpace>(99.0, 14.0, -123.0).normalized().len(),
             1.0
         );
     }

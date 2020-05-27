@@ -3,13 +3,6 @@ use crate::color::Color;
 
 use std::f32;
 
-#[derive(Debug, Copy, Clone)]
-pub enum ColorBufferFormat {
-    RGBA,
-    BGRA,
-    ARGB,
-}
-
 const CLEAR_COLOR: u32 = 0xFF191919;
 
 #[derive(Debug)]
@@ -151,10 +144,12 @@ mod tests {
         let colors = [RED, RED, BLUE, BLUE];
         let expected = 0xFF7F007Fu32;
         let avg = ColorBuffer::box_filter_color(&colors);
+        assert_eq!(expected, avg, "{:x}, {:x}", expected, avg);
 
         let colors = [RED, GREEN, RED, GREEN];
         let expected = 0xFF7F7F00u32;
         let avg = ColorBuffer::box_filter_color(&colors);
+        assert_eq!(expected, avg, "{:x}, {:x}", expected, avg);
     }
 
     #[test]

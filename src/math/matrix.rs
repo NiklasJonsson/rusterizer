@@ -144,7 +144,7 @@ where
     CST: CoordinateSystem,
 {
     pub fn identity() -> Self {
-        let mut array = [[0.0f32; { 4 }]; { 4 }];
+        let mut array = [[0.0f32; 4]; 4];
 
         for i in 0..4 {
             array[i][i] = 1.0;

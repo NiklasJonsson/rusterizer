@@ -13,8 +13,8 @@ impl Camera {
         // Camera looks in negative z of its own space
         // Camera space is left-handed just like world space
         let cam_z = -self.dir;
-        let cam_x = cam_z.cross(self.up).normalize();
-        let cam_y = cam_x.cross(cam_z).normalize();
+        let cam_x = cam_z.cross(self.up).normalized();
+        let cam_y = cam_x.cross(cam_z).normalized();
 
         let rotation_inv = mat4(
             cam_x.x(),
@@ -46,8 +46,8 @@ impl Camera {
 impl Default for Camera {
     fn default() -> Camera {
         let pos = Point3D::<WorldSpace>::new(0.0, 0.0, -5.0);
-        let up = vec3::<WorldSpace>(0.0, 1.0, 0.0).normalize();
-        let dir = vec3::<WorldSpace>(0.0, 0.0, 1.0).normalize();
+        let up = vec3::<WorldSpace>(0.0, 1.0, 0.0).normalized();
+        let dir = vec3::<WorldSpace>(0.0, 0.0, 1.0).normalized();
 
         Camera { pos, up, dir }
     }

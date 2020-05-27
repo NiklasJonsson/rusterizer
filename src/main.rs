@@ -2,7 +2,7 @@
 #![feature(unsized_locals)]
 #![feature(clamp)]
 
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 mod camera;
 mod color;
@@ -69,19 +69,14 @@ fn main() {
 
     let mut renderer = Renderer::new(WIDTH, HEIGHT);
 
-    let mut avg = Duration::new(0, 0);
-    let mut iterations = 0;
-
-    {
-        let block = renderer.uniforms().write_block();
-        block.view = camera.get_view_matrix();
-        block.projection = math::project(
-            1.0,
-            200.0,
-            HEIGHT as f32 / WIDTH as f32,
-            std::f32::consts::FRAC_PI_2,
-        );
-    }
+    let block = renderer.uniforms().write_block();
+    block.view = camera.get_view_matrix();
+    block.projection = math::project(
+        1.0,
+        200.0,
+        HEIGHT as f32 / WIDTH as f32,
+        std::f32::consts::FRAC_PI_2,
+    );
 
     let tex = texture::Texture::from_png_file("images/checkerboard.png");
     renderer.uniforms().bind_texture(0, tex);
@@ -100,8 +95,6 @@ fn main() {
 
     let start = Instant::now();
     loop {
-        let t0 = Instant::now();
-
         let diff = start.elapsed().as_secs_f32();
 
         matrices[0] = math::rotate::<math::WorldSpace>(diff, diff, 0.0);
@@ -112,8 +105,6 @@ fn main() {
             renderer.uniforms().write_block().world = *mat;
             renderer.render(&mesh, vertex_shader, fragment_shader);
         }
-
-        print!("{:?}", t0.elapsed());
 
         match renderer.display() {
             Err(e) => {
