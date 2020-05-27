@@ -10,8 +10,11 @@ pub enum ColorBufferFormat {
     ARGB,
 }
 
+const CLEAR_COLOR: u32 = 0xFF191919;
+
 #[derive(Debug)]
 pub struct ColorBuffer {
+    clear_buffer: Vec<[u32; N_MSAA_SAMPLES as usize]>,
     buffer: Vec<[u32; N_MSAA_SAMPLES as usize]>,
     resolve_buffer: Vec<u32>,
     width: usize,
@@ -21,43 +24,28 @@ pub struct ColorBuffer {
 impl ColorBuffer {
     pub fn new(width: usize, height: usize) -> Self {
         let mut buffer = Vec::with_capacity(width * height);
+        let mut clear_buffer = Vec::with_capacity(width * height);
         let mut resolve_buffer = Vec::with_capacity(width * height);
         // Initialize to black
         for _i in 0..width * height {
-            buffer.push([0; N_MSAA_SAMPLES as usize]);
+            buffer.push([CLEAR_COLOR; N_MSAA_SAMPLES as usize]);
+            clear_buffer.push([CLEAR_COLOR; N_MSAA_SAMPLES as usize]);
             resolve_buffer.push(0);
         }
-        let mut ret = Self {
+
+        Self {
+            clear_buffer,
             buffer,
             resolve_buffer,
             width,
             height,
-        };
-
-        ret.clear();
-        ret
+        }
     }
 
     // Clear to dark grey
     pub fn clear(&mut self) {
         debug_assert_eq!(self.buffer.len(), self.height * self.width);
-        for i in 0..self.height {
-            for j in 0..self.width {
-                for mask_idx in 0..N_MSAA_SAMPLES {
-                    self.set_pixel(
-                        i,
-                        j,
-                        Color {
-                            r: 0.1,
-                            g: 0.1,
-                            b: 0.1,
-                            a: 1.0,
-                        },
-                        mask_idx,
-                    );
-                }
-            }
-        }
+        self.buffer.copy_from_slice(&self.clear_buffer);
     }
 
     pub fn set_pixel(&mut self, row: usize, col: usize, color: Color, mask_idx: u8) {
@@ -95,6 +83,7 @@ impl ColorBuffer {
 #[derive(Debug)]
 pub struct DepthBuffer {
     buffer: Vec<[f32; N_MSAA_SAMPLES as usize]>,
+    clear_buffer: Vec<[f32; N_MSAA_SAMPLES as usize]>,
     width: usize,
     height: usize,
 }
@@ -102,12 +91,15 @@ pub struct DepthBuffer {
 impl DepthBuffer {
     pub fn new(width: usize, height: usize) -> Self {
         let mut buffer = Vec::with_capacity(width * height);
+        let mut clear_buffer = Vec::with_capacity(width * height);
         // Initialize to max depth => everything will be in front
         for _i in 0..width * height {
             buffer.push([f32::MAX; N_MSAA_SAMPLES as usize]);
+            clear_buffer.push([f32::MAX; N_MSAA_SAMPLES as usize]);
         }
         Self {
             buffer,
+            clear_buffer,
             width,
             height,
         }
@@ -115,9 +107,7 @@ impl DepthBuffer {
 
     pub fn clear(&mut self) {
         debug_assert_eq!(self.buffer.len(), self.height * self.width);
-        for i in 0..self.width * self.height {
-            self.buffer[i] = [f32::MAX; N_MSAA_SAMPLES as usize];
-        }
+        self.buffer.copy_from_slice(&self.clear_buffer);
     }
 
     pub fn get_depth(&self, row: usize, col: usize) -> [f32; N_MSAA_SAMPLES as usize] {
