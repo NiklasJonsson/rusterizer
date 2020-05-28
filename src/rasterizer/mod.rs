@@ -360,7 +360,7 @@ impl Rasterizer {
         cov: CoverageMask,
         sampled_depths: &[f32; N_MSAA_SAMPLES as usize],
     ) -> CoverageMask {
-        let cur_depths = self.depth_buffers[self.buf_idx].get_depth(row, col);
+        let cur_depths = self.depth_buffers[self.buf_idx].get_depth(row * self.width + col);
         let mut depth_cov = CoverageMask::new();
         for i in 0..N_MSAA_SAMPLES {
             if cov.get(i) {
@@ -380,8 +380,9 @@ impl Rasterizer {
     ) {
         for i in 0..N_MSAA_SAMPLES {
             if cov_mask.get(i) {
-                self.color_buffers[self.buf_idx].set_pixel(row, col, color, i);
-                self.depth_buffers[self.buf_idx].set_depth(row, col, depths[i as usize], i);
+                let idx = row * self.width + col;
+                self.color_buffers[self.buf_idx].set_pixel(idx, i, color);
+                self.depth_buffers[self.buf_idx].set_depth(idx, i, depths[i as usize]);
             }
         }
     }
@@ -437,12 +438,32 @@ impl Rasterizer {
         }
     }
 
+    fn resolve_and_clear(&mut self, buf_idx: usize) -> &[u32] {
+        debug_assert_eq!(
+            self.width * self.height,
+            self.color_buffers[self.buf_idx].buffer.len()
+        );
+        debug_assert_eq!(
+            self.width * self.height,
+            self.depth_buffers[self.buf_idx].buffer.len()
+        );
+
+        let resolve = &mut self.color_buffers[self.buf_idx].resolve_buffer;
+        let cbuf = &mut self.color_buffers[self.buf_idx].buffer;
+        let dbuf = &mut self.depth_buffers[self.buf_idx].buffer;
+        for (r, (c, d)) in resolve.iter_mut().zip(cbuf.iter_mut().zip(dbuf.iter_mut())) {
+            *r = ColorBuffer::box_filter_color(c);
+            *c = [buffers::CLEAR_COLOR; N_MSAA_SAMPLES as usize];
+            *d = [buffers::CLEAR_DEPTH; N_MSAA_SAMPLES as usize];
+        }
+
+        resolve
+    }
+
     pub fn swap_buffers(&mut self) -> &[u32] {
         let prev = self.buf_idx;
         self.buf_idx = (self.buf_idx + 1) % 2;
-        self.depth_buffers[self.buf_idx].clear();
-        self.color_buffers[self.buf_idx].clear();
-        self.color_buffers[prev].resolve()
+        self.resolve_and_clear(prev)
     }
 }
 

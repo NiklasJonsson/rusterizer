@@ -3,15 +3,14 @@ use crate::color::Color;
 
 use std::f32;
 
-const CLEAR_COLOR: u32 = 0xFF191919;
+pub const CLEAR_COLOR: u32 = 0xFF191919;
+pub const CLEAR_DEPTH: f32 = f32::MAX;
 
 #[derive(Debug)]
 pub struct ColorBuffer {
-    clear_buffer: Vec<[u32; N_MSAA_SAMPLES as usize]>,
-    buffer: Vec<[u32; N_MSAA_SAMPLES as usize]>,
-    resolve_buffer: Vec<u32>,
-    width: usize,
-    height: usize,
+    pub clear_buffer: Vec<[u32; N_MSAA_SAMPLES as usize]>,
+    pub buffer: Vec<[u32; N_MSAA_SAMPLES as usize]>,
+    pub resolve_buffer: Vec<u32>,
 }
 
 impl ColorBuffer {
@@ -29,22 +28,14 @@ impl ColorBuffer {
             clear_buffer,
             buffer,
             resolve_buffer,
-            width,
-            height,
         }
     }
 
-    // Clear to dark grey
-    pub fn clear(&mut self) {
-        debug_assert_eq!(self.buffer.len(), self.height * self.width);
-        self.buffer.copy_from_slice(&self.clear_buffer);
+    pub fn set_pixel(&mut self, pixel_idx: usize, mask_idx: u8, color: Color) {
+        self.buffer[pixel_idx][mask_idx as usize] = color.to_argb();
     }
 
-    pub fn set_pixel(&mut self, row: usize, col: usize, color: Color, mask_idx: u8) {
-        self.buffer[row * self.width + col][mask_idx as usize] = color.to_argb();
-    }
-
-    fn box_filter_color(colors: &[u32; N_MSAA_SAMPLES as usize]) -> u32 {
+    pub fn box_filter_color(colors: &[u32; N_MSAA_SAMPLES as usize]) -> u32 {
         let mut red_sum = 0;
         let mut blue_sum = 0;
         let mut green_sum = 0;
@@ -59,22 +50,12 @@ impl ColorBuffer {
             | (green_sum / N_MSAA_SAMPLES as u32) << 8
             | (blue_sum / N_MSAA_SAMPLES as u32)
     }
-
-    pub fn resolve(&mut self) -> &[u32] {
-        for (r, b) in self.resolve_buffer.iter_mut().zip(self.buffer.iter()) {
-            *r = Self::box_filter_color(b);
-        }
-
-        &self.resolve_buffer
-    }
 }
 
 #[derive(Debug)]
 pub struct DepthBuffer {
-    buffer: Vec<[f32; N_MSAA_SAMPLES as usize]>,
-    clear_buffer: Vec<[f32; N_MSAA_SAMPLES as usize]>,
-    width: usize,
-    height: usize,
+    pub buffer: Vec<[f32; N_MSAA_SAMPLES as usize]>,
+    pub clear_buffer: Vec<[f32; N_MSAA_SAMPLES as usize]>,
 }
 
 impl DepthBuffer {
@@ -83,29 +64,22 @@ impl DepthBuffer {
         let mut clear_buffer = Vec::with_capacity(width * height);
         // Initialize to max depth => everything will be in front
         for _i in 0..width * height {
-            buffer.push([f32::MAX; N_MSAA_SAMPLES as usize]);
-            clear_buffer.push([f32::MAX; N_MSAA_SAMPLES as usize]);
+            buffer.push([CLEAR_DEPTH; N_MSAA_SAMPLES as usize]);
+            clear_buffer.push([CLEAR_DEPTH; N_MSAA_SAMPLES as usize]);
         }
         Self {
             buffer,
             clear_buffer,
-            width,
-            height,
         }
     }
 
-    pub fn clear(&mut self) {
-        debug_assert_eq!(self.buffer.len(), self.height * self.width);
-        self.buffer.copy_from_slice(&self.clear_buffer);
+    pub fn get_depth(&self, idx: usize) -> &[f32; N_MSAA_SAMPLES as usize] {
+        &self.buffer[idx]
     }
 
-    pub fn get_depth(&self, row: usize, col: usize) -> [f32; N_MSAA_SAMPLES as usize] {
-        self.buffer[row * self.width + col]
-    }
-
-    pub fn set_depth(&mut self, row: usize, col: usize, depth: f32, mask_idx: u8) {
+    pub fn set_depth(&mut self, idx: usize, mask_idx: u8, depth: f32) {
         debug_assert!(depth >= 0.0 && depth <= 1.0, "Invalid depth: {}", depth);
-        self.buffer[row * self.width + col][mask_idx as usize] = depth;
+        self.buffer[idx][mask_idx as usize] = depth;
     }
 }
 

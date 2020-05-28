@@ -63,8 +63,8 @@ impl Texture {
     }
 
     pub fn sample(&self, u: f32, v: f32) -> Color {
-        debug_assert!(u >= 0.0 && u <= 1.0, "Inncorrect u coordinate: {}", u);
-        debug_assert!(v >= 0.0 && v <= 1.0, "Inncorrect v coordinate: {}", v);
+        debug_assert!(u >= 0.0 && u <= 1.0, "Incorrect u coordinate: {}", u);
+        debug_assert!(v >= 0.0 && v <= 1.0, "Incorrect v coordinate: {}", v);
         let x = (u * (self.width - 1) as f32) + 0.5;
         let y = (v * (self.height - 1) as f32) + 0.5;
         self.read_texel(x as usize, y as usize)
