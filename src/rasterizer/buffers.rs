@@ -18,7 +18,7 @@ impl ColorBuffer {
     pub fn new(width: usize, height: usize) -> Self {
         let mut buffer = Vec::with_capacity(width * height);
         let mut clear_buffer = Vec::with_capacity(width * height);
-        let mut resolve_buffer = vec![0u32; width * height];
+        let resolve_buffer = vec![0u32; width * height];
         // Initialize to black
         for _i in 0..width * height {
             buffer.push([CLEAR_COLOR; N_MSAA_SAMPLES as usize]);
