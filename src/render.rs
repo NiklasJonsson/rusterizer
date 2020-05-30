@@ -39,12 +39,13 @@ pub struct Renderer {
     rasterizer: Rasterizer,
     window: minifb::Window,
     uniforms: Uniforms,
+    frame_time_idx: usize,
 }
 
 impl Renderer {
     pub fn new(width: usize, height: usize) -> Renderer {
         let window = minifb::Window::new(
-            "Rusterizer - ESC to exit",
+            "Rusterizer",
             width,
             height,
             minifb::WindowOptions::default(),
@@ -59,6 +60,7 @@ impl Renderer {
             rasterizer,
             window,
             uniforms: Uniforms::new(),
+            frame_time_idx: 0,
         }
     }
 
@@ -117,5 +119,17 @@ impl Renderer {
         self.window.update_with_buffer(color_buffer)?;
 
         Ok(true)
+    }
+
+    pub fn display_frame_time(&mut self, d: &std::time::Duration) {
+        if self.frame_time_idx == 10 {
+            let t = d.as_secs_f32();
+            self.window.set_title(
+                format!("Rusterizer FPS: {:.2}, ({:.2})", 1.0f32 / t, t * 1000.0f32).as_str(),
+            );
+            self.frame_time_idx = 0;
+        } else {
+            self.frame_time_idx += 1;
+        }
     }
 }

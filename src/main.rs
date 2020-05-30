@@ -94,9 +94,12 @@ fn main() {
     let fragment_shader = choose_shader(&args);
 
     let start = Instant::now();
+    let mut now = Instant::now();
     loop {
-        let diff = start.elapsed().as_secs_f32();
+        renderer.display_frame_time(&now.elapsed());
+        now = Instant::now();
 
+        let diff = start.elapsed().as_secs_f32();
         matrices[0] = math::rotate::<math::WorldSpace>(diff, diff, 0.0);
         matrices[1] = math::rotate::<math::WorldSpace>(diff, 0.0, std::f32::consts::FRAC_PI_4)
             * math::translate::<math::WorldSpace>(0.0, 3.0, 0.0);
