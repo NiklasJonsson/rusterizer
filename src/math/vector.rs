@@ -84,8 +84,8 @@ where
 {
     type Output = Self;
     fn neg(mut self) -> Self {
-        for i in 0..N {
-            self.arr[i] = -self.arr[i];
+        for v in self.arr.iter_mut() {
+            *v *= -1.0;
         }
 
         self
@@ -98,8 +98,8 @@ where
 {
     type Output = Self;
     fn mul(mut self, other: f32) -> Self::Output {
-        for i in 0..N {
-            self.arr[i] *= other;
+        for v in self.arr.iter_mut() {
+            *v *= other;
         }
 
         self
@@ -112,8 +112,8 @@ where
 {
     type Output = Self;
     fn div(mut self, other: f32) -> Self::Output {
-        for i in 0..N {
-            self.arr[i] /= other;
+        for v in self.arr.iter_mut() {
+            *v /= other;
         }
 
         self
@@ -126,8 +126,8 @@ where
 {
     type Output = Self;
     fn add(mut self, other: Self) -> Self::Output {
-        for i in 0..N {
-            self.arr[i] += other.arr[i];
+        for (a, b) in self.arr.iter_mut().zip(other.arr.iter()) {
+            *a += b;
         }
 
         self
@@ -140,8 +140,8 @@ where
 {
     type Output = Self;
     fn sub(mut self, other: Self) -> Self::Output {
-        for i in 0..N {
-            self.arr[i] -= other.arr[i];
+        for (a, b) in self.arr.iter_mut().zip(other.arr.iter()) {
+            *a -= b;
         }
 
         self

@@ -84,12 +84,13 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Triangle:")?;
-        for i in 0..3 {
-            write!(
-                f,
-                "  {}:\n    {:?}\n    {:?}\n",
-                i, self.vertices[i], self.vertex_attributes[i]
-            )?;
+        for (i, (v, va)) in self
+            .vertices
+            .iter()
+            .zip(self.vertex_attributes.iter())
+            .enumerate()
+        {
+            write!(f, "  {}:\n    {:?}\n    {:?}\n", i, v, va)?;
         }
 
         Ok(())

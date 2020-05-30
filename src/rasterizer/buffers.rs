@@ -18,12 +18,11 @@ impl ColorBuffer {
     pub fn new(width: usize, height: usize) -> Self {
         let mut buffer = Vec::with_capacity(width * height);
         let mut clear_buffer = Vec::with_capacity(width * height);
-        let mut resolve_buffer = Vec::with_capacity(width * height);
+        let mut resolve_buffer = vec![0u32; width * height];
         // Initialize to black
         for _i in 0..width * height {
             buffer.push([CLEAR_COLOR; N_MSAA_SAMPLES as usize]);
             clear_buffer.push([CLEAR_COLOR; N_MSAA_SAMPLES as usize]);
-            resolve_buffer.push(0);
         }
 
         Self {
@@ -49,10 +48,10 @@ impl ColorBuffer {
         let mut red_sum = 0;
         let mut blue_sum = 0;
         let mut green_sum = 0;
-        for i in 0..N_MSAA_SAMPLES {
-            red_sum += (colors[i as usize] & 0x00FF0000) >> 16;
-            green_sum += (colors[i as usize] & 0x0000FF00) >> 8;
-            blue_sum += colors[i as usize] & 0x000000FF;
+        for c in colors.iter() {
+            red_sum += (c & 0x00FF0000) >> 16;
+            green_sum += (c & 0x0000FF00) >> 8;
+            blue_sum += c & 0x000000FF;
         }
 
         (0xFF << 24)
@@ -62,11 +61,8 @@ impl ColorBuffer {
     }
 
     pub fn resolve(&mut self) -> &[u32] {
-        for i in 0..self.height {
-            for j in 0..self.width {
-                let idx = i * self.width + j;
-                self.resolve_buffer[idx] = Self::box_filter_color(&self.buffer[idx]);
-            }
+        for (r, b) in self.resolve_buffer.iter_mut().zip(self.buffer.iter()) {
+            *r = Self::box_filter_color(b);
         }
 
         &self.resolve_buffer
