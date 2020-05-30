@@ -81,7 +81,8 @@ fn main() {
     let tex = texture::Texture::from_png_file("images/checkerboard.png");
     renderer.uniforms().bind_texture(0, tex);
 
-    let meshes = [mesh::cube(1.0), mesh::sphere(0.5)];
+    //let meshes = [mesh::cube(1.0), mesh::sphere(0.5)];
+    let meshes = [mesh::cube(1.0)];
     let mut matrices = [math::Mat4::<math::WorldSpace>::identity(); 2];
 
     let vertex_shader = |uniforms: &Uniforms, vertex: &math::Point3D<math::WorldSpace>| {
