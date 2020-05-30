@@ -29,8 +29,7 @@ impl Texture {
         let (info, mut reader) = decoder.read_info().expect("Failed to read info");
         debug_assert!(!reader.info().interlaced);
         // Allocate the output buffer.
-        let mut buf = Vec::with_capacity(info.buffer_size());
-        buf.resize(info.buffer_size(), 0);
+        let mut buf = vec![0; info.buffer_size()];
         // Read the next frame. Currently this function should only called once.
         // The default options
         reader.next_frame(&mut buf).unwrap();

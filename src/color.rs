@@ -15,7 +15,7 @@ impl Color {
         ((self.a * 255.0) as u32) << 24
             | ((self.r * 255.0) as u32) << 16
             | ((self.g * 255.0) as u32) << 8
-            | ((self.b * 255.0) as u32) << 0
+            | ((self.b * 255.0) as u32)
     }
 
     pub fn from_rgba(rgba: [u8; 4]) -> Self {

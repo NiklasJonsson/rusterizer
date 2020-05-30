@@ -83,7 +83,7 @@ where
     CS: PrintableType + CoordinateSystem,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Triangle:\n")?;
+        writeln!(f, "Triangle:")?;
         for i in 0..3 {
             write!(
                 f,

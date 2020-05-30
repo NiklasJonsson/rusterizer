@@ -61,12 +61,12 @@ where
 {
     type Output = Matrix<CSF, CST, { N }>;
     fn mul(self, other: Matrix<CSF, CSM, { N }>) -> Self::Output {
-        let mut result = self.array.clone();
-        for i in 0..N {
-            for j in 0..N {
-                let r: Vector<CSF, { N }> = self.row(i).into();
+        let mut result = self.array;
+        for row in result.iter_mut() {
+            let r: Vector<CSF, { N }> = (*row).into();
+            for (j, v) in row.iter_mut().enumerate() {
                 let c: Vector<CSF, { N }> = other.col(j).into();
-                result[i][j] = r.dot(c).into();
+                *v = r.dot(c);
             }
         }
 
@@ -84,14 +84,10 @@ where
     CST: CoordinateSystem,
 {
     fn eq(&self, other: &Self) -> bool {
-        for i in 0..N {
-            for j in 0..N {
-                if self.array[i][j] != other.array[i][j] {
-                    return false;
-                }
-            }
-        }
-        return true;
+        self.array
+            .iter()
+            .zip(other.array.iter())
+            .all(|(a, b)| a.iter().zip(b.iter()).all(|(x, y)| x == y))
     }
 }
 
@@ -112,21 +108,21 @@ where
     }
 
     pub fn col(&self, j: usize) -> [f32; N] {
-        let mut result = self.array[0].clone();
+        let mut result = self.array[0];
 
-        for i in 0..N {
-            result[i] = self.array[i][j];
+        for (i, v) in result.iter_mut().enumerate() {
+            *v = self.array[i][j];
         }
 
         result
     }
 
     pub fn transpose(&self) -> Self {
-        let mut tmp = self.array.clone();
+        let mut tmp = self.array;
 
-        for i in 0..N {
-            for j in 0..N {
-                tmp[i][j] = self.array[j][i];
+        for (i, row) in tmp.iter_mut().enumerate() {
+            for (j, v) in row.iter_mut().enumerate() {
+                *v = self.array[j][i];
             }
         }
 
@@ -146,8 +142,8 @@ where
     pub fn identity() -> Self {
         let mut array = [[0.0f32; 4]; 4];
 
-        for i in 0..4 {
-            array[i][i] = 1.0;
+        for (i, row) in array.iter_mut().enumerate() {
+            row[i] = 1.0;
         }
 
         Self {
@@ -159,7 +155,7 @@ where
 
     pub fn from_raw(inp: &[[f32; 4]; 4]) -> Self {
         Self {
-            array: inp.clone(),
+            array: *inp,
             _to_coordinate_space: PhantomData,
             _from_coordinate_space: PhantomData,
         }

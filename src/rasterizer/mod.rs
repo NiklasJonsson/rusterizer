@@ -221,7 +221,7 @@ impl RasterizerTriangle {
     }
 
     // See realtime rendering on details
-    fn fragment<'a>(&'a self) -> Fragment<'a> {
+    fn fragment(&self) -> Fragment<'_> {
         let interpolate_depth = |edge_functions: &[f32; 3]| -> f32 {
             // Linear barycentrics, used only for interpolating z
             let bary0 = clamp_bary(edge_functions[1] * self.inv_2x_area);

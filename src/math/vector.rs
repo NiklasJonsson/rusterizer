@@ -226,10 +226,10 @@ where
             arr,
             coordinate_system: _,
         } = other;
-        let mut result = arr.clone();
-        for i in 0..N {
+        let mut result = arr;
+        for (i, r) in result.iter_mut().enumerate() {
             let row: Vector<CSF, { N }> = self.row(i).into();
-            result[i] = row.dot(other).into();
+            *r = row.dot(other);
         }
         Self::Output {
             arr: result,

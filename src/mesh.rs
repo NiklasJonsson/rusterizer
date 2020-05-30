@@ -11,6 +11,7 @@ where
     pub attributes: Vec<VertexAttribute>,
 }
 
+#[allow(unused)]
 pub fn centered_quad<CS>(width: f32) -> Mesh<CS>
 where
     CS: CoordinateSystem,
@@ -38,6 +39,7 @@ where
     }
 }
 
+#[allow(unused)]
 pub fn triangle<CS>() -> Mesh<CS>
 where
     CS: CoordinateSystem,
@@ -62,6 +64,7 @@ where
     }
 }
 
+#[allow(unused)]
 pub fn cube<CS>(width: f32) -> Mesh<CS>
 where
     CS: CoordinateSystem,
@@ -145,6 +148,7 @@ where
     }
 }
 
+#[allow(unused)]
 pub fn sphere<CS>(radius: f32) -> Mesh<CS>
 where
     CS: CoordinateSystem,
