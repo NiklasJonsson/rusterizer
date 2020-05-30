@@ -1,10 +1,84 @@
+use super::bounding_box::PixelBoundingBox;
 use super::N_MSAA_SAMPLES;
 use crate::color::Color;
 
-use std::f32;
-
 pub const CLEAR_COLOR: u32 = 0xFF191919;
 pub const CLEAR_DEPTH: f32 = f32::MAX;
+
+pub const TILE_SIZE: usize = 64;
+pub const CLEAR_SUB_BUFFER: [u32; TILE_SIZE] = [CLEAR_COLOR; TILE_SIZE];
+
+// Keeps two masks to allow clearing prev resolve buffer before writing
+pub struct BufferTiles {
+    tiles: Vec<PixelBoundingBox>,
+    masks: [Vec<bool>; 2],
+    mask_idx: usize,
+    n_horizontal: usize,
+}
+
+impl BufferTiles {
+    pub fn new(width: usize, height: usize) -> Self {
+        let is_width_exact = width % TILE_SIZE == 0;
+        let is_height_exact = height % TILE_SIZE == 0;
+        let n_horizontal = width / TILE_SIZE + if is_width_exact { 0 } else { 1 };
+        let n_vertical = height / TILE_SIZE + if is_height_exact { 0 } else { 1 };
+
+        let n_tiles = n_horizontal * n_vertical;
+
+        let mut tiles = Vec::with_capacity(n_tiles);
+
+        for j in 0..n_vertical {
+            for i in 0..n_horizontal {
+                tiles.push(PixelBoundingBox {
+                    min_x: i * TILE_SIZE,
+                    max_x: ((i + 1) * TILE_SIZE).min(width),
+                    min_y: j * TILE_SIZE,
+                    max_y: ((j + 1) * TILE_SIZE).min(height),
+                });
+            }
+        }
+        let masks = [vec![false; n_tiles], vec![false; n_tiles]];
+
+        Self {
+            tiles,
+            masks,
+            n_horizontal,
+            mask_idx: 0,
+        }
+    }
+
+    pub fn tile_idx(&self, row: usize, col: usize) -> usize {
+        (row / TILE_SIZE) * self.n_horizontal + (col / TILE_SIZE)
+    }
+
+    pub fn mark(&mut self, row: usize, col: usize) {
+        let idx = self.tile_idx(row, col);
+        self.masks[self.mask_idx][idx] = true;
+    }
+
+    pub fn next(&mut self) {
+        self.mask_idx = (self.mask_idx + 1) % 2;
+        for v in self.masks[self.mask_idx].iter_mut() {
+            *v = false;
+        }
+    }
+
+    pub fn prev_marked(&self) -> impl Iterator<Item = &PixelBoundingBox> {
+        self.tiles
+            .iter()
+            .zip(self.masks[(self.mask_idx + 1) % 2].iter())
+            .filter(|(_, &marked)| marked)
+            .map(|(tile, _)| tile)
+    }
+
+    pub fn marked(&self) -> impl Iterator<Item = &PixelBoundingBox> {
+        self.tiles
+            .iter()
+            .zip(self.masks[self.mask_idx].iter())
+            .filter(|(_, &marked)| marked)
+            .map(|(tile, _)| tile)
+    }
+}
 
 #[derive(Debug)]
 pub struct ColorBuffer {
@@ -17,7 +91,7 @@ impl ColorBuffer {
     pub fn new(width: usize, height: usize) -> Self {
         let mut buffer = Vec::with_capacity(width * height);
         let mut clear_buffer = Vec::with_capacity(width * height);
-        let resolve_buffer = vec![0u32; width * height];
+        let resolve_buffer = vec![CLEAR_COLOR; width * height];
         // Initialize to black
         for _i in 0..width * height {
             buffer.push([CLEAR_COLOR; N_MSAA_SAMPLES as usize]);
@@ -137,5 +211,110 @@ mod tests {
         let avg = ColorBuffer::box_filter_color(&colors);
         let expected = 0xFF6A9640u32;
         assert_eq!(expected, avg, "{:x}, {:x}", expected, avg);
+    }
+
+    #[test]
+    fn buffer_tiles_pow_2_square() {
+        let mut tiles = BufferTiles::new(128, 128);
+
+        assert_eq!(tiles.tiles.len(), 128 / TILE_SIZE * 128 / TILE_SIZE);
+        assert!(tiles.masks[0].iter().all(|x| !x));
+        assert_eq!(tiles.tiles[0].min_x, 0);
+        assert_eq!(tiles.tiles[0].max_x, TILE_SIZE);
+        assert_eq!(tiles.tiles[0].min_y, 0);
+        assert_eq!(tiles.tiles[0].max_y, TILE_SIZE);
+
+        dbg!(&tiles.tiles);
+        assert_eq!(tiles.tiles[128 / TILE_SIZE - 1].min_x, 128 - TILE_SIZE);
+        assert_eq!(tiles.tiles[128 / TILE_SIZE - 1].max_x, 128);
+        assert_eq!(tiles.tiles[128 / TILE_SIZE - 1].min_y, 0);
+        assert_eq!(tiles.tiles[128 / TILE_SIZE - 1].max_y, TILE_SIZE);
+
+        assert_eq!(tiles.tiles.last().unwrap().min_x, 128 - TILE_SIZE);
+        assert_eq!(tiles.tiles.last().unwrap().max_x, 128);
+        assert_eq!(tiles.tiles.last().unwrap().min_y, 128 - TILE_SIZE);
+        assert_eq!(tiles.tiles.last().unwrap().max_y, 128);
+
+        tiles.mark(0, 0);
+        assert!(!tiles.masks[0].iter().all(|x| !x));
+        assert!(tiles.masks[0][0]);
+
+        tiles.mark(TILE_SIZE - 1, TILE_SIZE - 1);
+        assert_eq!(tiles.marked().count(), 1);
+        assert!(tiles.masks[0][0]);
+
+        tiles.mark(127, 127);
+        assert_eq!(tiles.marked().count(), 2);
+        assert!(tiles.masks[0].last().unwrap());
+
+        tiles.mark(64, 64);
+        let expected = if TILE_SIZE >= 64 { 2 } else { 3 };
+        assert_eq!(tiles.marked().count(), expected);
+        assert!(tiles.masks[0][64 / TILE_SIZE * (128 / TILE_SIZE) + 64 / TILE_SIZE]);
+    }
+
+    #[test]
+    fn buffer_tiles_uneven_rect() {
+        let mut tiles = BufferTiles::new(442, 711);
+        let n_horizontal = 7;
+        let n_vertical = 12;
+
+        assert_eq!(tiles.tiles.len(), n_horizontal * n_vertical);
+
+        assert_eq!(tiles.tiles[0].min_x, 0);
+        assert_eq!(tiles.tiles[0].max_x, TILE_SIZE);
+        assert_eq!(tiles.tiles[0].min_y, 0);
+        assert_eq!(tiles.tiles[0].max_y, TILE_SIZE);
+
+        assert_eq!(tiles.tiles.last().unwrap().min_x, 442 - (442 % TILE_SIZE));
+        assert_eq!(tiles.tiles.last().unwrap().max_x, 442);
+        assert_eq!(tiles.tiles.last().unwrap().min_y, 711 - (711 % TILE_SIZE));
+        assert_eq!(tiles.tiles.last().unwrap().max_y, 711);
+
+        // End of first row
+        assert_eq!(tiles.tiles[442 / TILE_SIZE].min_x, 442 - (442 % TILE_SIZE));
+        assert_eq!(tiles.tiles[442 / TILE_SIZE].max_x, 442);
+        assert_eq!(tiles.tiles[442 / TILE_SIZE].min_y, 0);
+        assert_eq!(tiles.tiles[442 / TILE_SIZE].max_y, TILE_SIZE);
+
+        // First column
+        assert_eq!(tiles.tiles[n_horizontal * (n_vertical - 1)].min_x, 0);
+        assert_eq!(
+            tiles.tiles[n_horizontal * (n_vertical - 1)].max_x,
+            TILE_SIZE
+        );
+        assert_eq!(
+            tiles.tiles[n_horizontal * (n_vertical - 1)].min_y,
+            711 - (711 % TILE_SIZE)
+        );
+        assert_eq!(tiles.tiles[n_horizontal * (n_vertical - 1)].max_y, 711);
+
+        tiles.mark(0, 0);
+        assert!(!tiles.masks[0].iter().all(|x| !x));
+        assert!(tiles.masks[0][0]);
+
+        tiles.mark(TILE_SIZE - 1, TILE_SIZE - 1);
+        assert_eq!(tiles.marked().count(), 1);
+        assert!(tiles.masks[0][0]);
+
+        tiles.mark(711, 442);
+        assert_eq!(tiles.marked().count(), 2);
+        assert!(tiles.masks[0].last().unwrap());
+
+        tiles.mark(64, 64);
+        assert_eq!(tiles.marked().count(), 3);
+        assert!(tiles.masks[0][64 / TILE_SIZE * (442 / TILE_SIZE + 1) + 64 / TILE_SIZE]);
+
+        tiles.next();
+
+        assert_eq!(tiles.marked().count(), 0);
+        assert_eq!(tiles.prev_marked().count(), 3);
+        assert!(tiles.masks[0][64 / TILE_SIZE * (442 / TILE_SIZE + 1) + 64 / TILE_SIZE]);
+        assert!(tiles.masks[0].last().unwrap());
+
+        tiles.next();
+
+        assert_eq!(tiles.marked().count(), 0);
+        assert_eq!(tiles.prev_marked().count(), 0);
     }
 }

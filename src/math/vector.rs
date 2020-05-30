@@ -15,10 +15,11 @@ where
     CS: CoordinateSystem,
 {
     pub fn dot(self, other: Vector<CS, { N }>) -> f32 {
-        self.arr
-            .iter()
-            .zip(other.arr.iter())
-            .fold(0.0, |acc, (elem0, elem1)| acc + elem0 * elem1)
+        let mut sum = 0.0;
+        for (v0, v1) in self.arr.iter().zip(other.arr.iter()) {
+            sum += *v0 * *v1;
+        }
+        sum
     }
 
     pub fn x(&self) -> f32 {

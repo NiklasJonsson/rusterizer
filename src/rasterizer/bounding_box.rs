@@ -2,7 +2,7 @@ use std::f32;
 
 use crate::math::Point2D;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PixelBoundingBox {
     pub min_x: usize,
     pub max_x: usize,

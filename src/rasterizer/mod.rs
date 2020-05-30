@@ -263,6 +263,7 @@ pub struct FragCoords {
 pub struct Rasterizer {
     color_buffer: ColorBuffer,
     depth_buffer: DepthBuffer,
+    buffer_tiles: BufferTiles,
     width: usize,
     height: usize,
 }
@@ -274,6 +275,7 @@ impl Rasterizer {
             height,
             color_buffer: ColorBuffer::new(width, height),
             depth_buffer: DepthBuffer::new(width, height),
+            buffer_tiles: BufferTiles::new(width, height),
         }
     }
 
@@ -366,6 +368,8 @@ impl Rasterizer {
         depths: &[f32; N_MSAA_SAMPLES as usize],
         cov_mask: CoverageMask,
     ) {
+        debug_assert!(cov_mask.any());
+        self.buffer_tiles.mark(row, col);
         for i in 0..N_MSAA_SAMPLES {
             if cov_mask.get(i) {
                 let idx = row * self.width + col;
@@ -433,11 +437,37 @@ impl Rasterizer {
         let resolve = &mut self.color_buffer.resolve_buffer;
         let cbuf = &mut self.color_buffer.buffer;
         let dbuf = &mut self.depth_buffer.buffer;
-        for (r, (c, d)) in resolve.iter_mut().zip(cbuf.iter_mut().zip(dbuf.iter_mut())) {
-            *r = ColorBuffer::box_filter_color(c);
-            *c = [buffers::CLEAR_COLOR; N_MSAA_SAMPLES as usize];
-            *d = [buffers::CLEAR_DEPTH; N_MSAA_SAMPLES as usize];
+
+        for tile in self.buffer_tiles.prev_marked() {
+            for y in tile.min_y..tile.max_y {
+                for x in tile.min_x..tile.max_x {
+                    let idx = y * self.width + x;
+                    resolve[idx] = buffers::CLEAR_COLOR;
+                }
+            }
         }
+
+        debug_assert!(resolve.iter().all(|&x| x == buffers::CLEAR_COLOR));
+
+        for tile in self.buffer_tiles.marked() {
+            for y in tile.min_y..tile.max_y {
+                for x in tile.min_x..tile.max_x {
+                    let idx = y * self.width + x;
+                    resolve[idx] = ColorBuffer::box_filter_color(&cbuf[idx]);
+                    cbuf[idx] = [buffers::CLEAR_COLOR; N_MSAA_SAMPLES as usize];
+                    dbuf[idx] = [buffers::CLEAR_DEPTH; N_MSAA_SAMPLES as usize];
+                }
+            }
+        }
+
+        debug_assert!(cbuf
+            .iter()
+            .all(|x| x.iter().all(|v| *v == buffers::CLEAR_COLOR)));
+        debug_assert!(dbuf
+            .iter()
+            .all(|x| x.iter().all(|v| *v == buffers::CLEAR_DEPTH)));
+
+        self.buffer_tiles.next();
 
         resolve
     }
