@@ -261,31 +261,19 @@ pub struct FragCoords {
 }
 
 pub struct Rasterizer {
-    color_buffers: [ColorBuffer; 2],
-    depth_buffers: [DepthBuffer; 2],
-    buf_idx: usize,
+    color_buffer: ColorBuffer,
+    depth_buffer: DepthBuffer,
     width: usize,
     height: usize,
 }
 
 impl Rasterizer {
     pub fn new(width: usize, height: usize) -> Self {
-        let color_buffers = [
-            ColorBuffer::new(width, height),
-            ColorBuffer::new(width, height),
-        ];
-
-        let depth_buffers = [
-            DepthBuffer::new(width, height),
-            DepthBuffer::new(width, height),
-        ];
-
         Self {
             width,
             height,
-            buf_idx: 0,
-            color_buffers,
-            depth_buffers,
+            color_buffer: ColorBuffer::new(width, height),
+            depth_buffer: DepthBuffer::new(width, height),
         }
     }
 
@@ -360,7 +348,7 @@ impl Rasterizer {
         cov: CoverageMask,
         sampled_depths: &[f32; N_MSAA_SAMPLES as usize],
     ) -> CoverageMask {
-        let cur_depths = self.depth_buffers[self.buf_idx].get_depth(row * self.width + col);
+        let cur_depths = self.depth_buffer.get_depth(row * self.width + col);
         let mut depth_cov = CoverageMask::new();
         for i in 0..N_MSAA_SAMPLES {
             if cov.get(i) {
@@ -381,8 +369,8 @@ impl Rasterizer {
         for i in 0..N_MSAA_SAMPLES {
             if cov_mask.get(i) {
                 let idx = row * self.width + col;
-                self.color_buffers[self.buf_idx].set_pixel(idx, i, color);
-                self.depth_buffers[self.buf_idx].set_depth(idx, i, depths[i as usize]);
+                self.color_buffer.set_pixel(idx, i, color);
+                self.depth_buffer.set_depth(idx, i, depths[i as usize]);
             }
         }
     }
@@ -438,19 +426,13 @@ impl Rasterizer {
         }
     }
 
-    fn resolve_and_clear(&mut self, buf_idx: usize) -> &[u32] {
-        debug_assert_eq!(
-            self.width * self.height,
-            self.color_buffers[self.buf_idx].buffer.len()
-        );
-        debug_assert_eq!(
-            self.width * self.height,
-            self.depth_buffers[self.buf_idx].buffer.len()
-        );
+    fn resolve_and_clear(&mut self) -> &[u32] {
+        debug_assert_eq!(self.width * self.height, self.color_buffer.buffer.len());
+        debug_assert_eq!(self.width * self.height, self.depth_buffer.buffer.len());
 
-        let resolve = &mut self.color_buffers[self.buf_idx].resolve_buffer;
-        let cbuf = &mut self.color_buffers[self.buf_idx].buffer;
-        let dbuf = &mut self.depth_buffers[self.buf_idx].buffer;
+        let resolve = &mut self.color_buffer.resolve_buffer;
+        let cbuf = &mut self.color_buffer.buffer;
+        let dbuf = &mut self.depth_buffer.buffer;
         for (r, (c, d)) in resolve.iter_mut().zip(cbuf.iter_mut().zip(dbuf.iter_mut())) {
             *r = ColorBuffer::box_filter_color(c);
             *c = [buffers::CLEAR_COLOR; N_MSAA_SAMPLES as usize];
@@ -460,10 +442,8 @@ impl Rasterizer {
         resolve
     }
 
-    pub fn swap_buffers(&mut self) -> &[u32] {
-        let prev = self.buf_idx;
-        self.buf_idx = (self.buf_idx + 1) % 2;
-        self.resolve_and_clear(prev)
+    pub fn framebuffer(&mut self) -> &[u32] {
+        self.resolve_and_clear()
     }
 }
 

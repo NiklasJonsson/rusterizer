@@ -118,7 +118,7 @@ impl Renderer {
             return Ok(false);
         }
 
-        let color_buffer = self.rasterizer.swap_buffers();
+        let color_buffer = self.rasterizer.framebuffer();
 
         self.window
             .update_with_buffer(color_buffer, self.width, self.height)?;
