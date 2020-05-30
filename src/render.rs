@@ -40,6 +40,8 @@ pub struct Renderer {
     window: minifb::Window,
     uniforms: Uniforms,
     frame_time_idx: usize,
+    width: usize,
+    height: usize,
 }
 
 impl Renderer {
@@ -61,6 +63,8 @@ impl Renderer {
             window,
             uniforms: Uniforms::new(),
             frame_time_idx: 0,
+            width,
+            height,
         }
     }
 
@@ -116,7 +120,7 @@ impl Renderer {
 
         let color_buffer = self.rasterizer.swap_buffers();
 
-        self.window.update_with_buffer(color_buffer)?;
+        self.window.update_with_buffer(color_buffer, self.width, self.height)?;
 
         Ok(true)
     }
