@@ -28,30 +28,44 @@ enum Intersection {
 const CULL_DEGENERATE_TRIANGLE_AREA_EPS: f32 = 0.000001;
 
 fn intersect(
-    plane: &Vec4<ClipSpace>,
+    plane_normal: &Vec4<ClipSpace>,
     p0: &Point4D<ClipSpace>,
     p1: &Point4D<ClipSpace>,
 ) -> Intersection {
-    let line_param_top = plane.dot(p0.to_vec());
-    let line_param_bottom = plane.dot(*p1 - *p0);
+    let p0_signed_dist = plane_normal.dot(p0.to_vec());
+    let p1_signed_dist = plane_normal.dot(p1.to_vec());
+    if p0_signed_dist > 0.0 && p1_signed_dist > 0.0 {
+        return Intersection::BothInside;
+    }
+
+    if p0_signed_dist < 0.0 && p1_signed_dist < 0.0 {
+        return Intersection::BothOutside;
+    }
+
+    // (1) Line: L(t) = p0 + (p1 - p0) * t
+    // (2) Plane: n * (p - p_a) == 0. For all our planes, p_a == 0 => n * p == 0
+    // Insert L(t) as p into (2) and solve for t (== line_param)
+    // t = -p0 * n / (p1 - p0) * n
+    let line_param_top = -plane_normal.dot(p0.to_vec());
+    let line_param_bottom = plane_normal.dot(*p1 - *p0);
+
+    // This means the line and the plane is parallell
     if line_param_bottom == 0.0 {
-        if line_param_top == 0.0 {
-            return Intersection::BothInside;
-        } else {
-            return Intersection::BothOutside;
-        }
+        // TODO: When is inside?
+        return Intersection::BothOutside;
     }
 
     let line_param = line_param_top / line_param_bottom;
     let intersection = *p0 + (*p1 - *p0) * line_param;
 
-    if line_param.is_sign_positive() {
+    if p0_signed_dist > 0.0 {
         return Intersection::FirstInside {
             point: intersection,
             line_param,
         };
     }
 
+    debug_assert!(p1_signed_dist > 0.0);
     Intersection::SecondInside {
         point: intersection,
         line_param: -line_param,
@@ -77,13 +91,15 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
         return ClipResult::Inside;
     }
 
+    // With these definitions, the positive half space points to inside the bounding box.
+    // => A point is inside for dot() > 0.0
     let clip_planes: [Vec4<ClipSpace>; 6] = [
         vec4(1.0, 0.0, 0.0, 1.0),
-        vec4(1.0, 0.0, 0.0, -1.0),
+        vec4(-1.0, 0.0, 0.0, 1.0),
         vec4(0.0, 1.0, 0.0, 1.0),
-        vec4(0.0, 1.0, 0.0, -1.0),
+        vec4(0.0, -1.0, 0.0, 1.0),
         vec4(0.0, 0.0, 1.0, 1.0),
-        vec4(0.0, 0.0, 1.0, -1.0),
+        vec4(0.0, 0.0, -1.0, 1.0),
     ];
 
     let mut out_vertices: Vec<Point4D<ClipSpace>> = triangle.vertices.to_vec();
@@ -120,7 +136,7 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
         }
     }
 
-    debug_assert!(out_attrs.len() == out_vertices.len());
+    debug_assert_eq!(out_attrs.len(), out_vertices.len());
 
     if out_vertices.len() == 3 {
         return ClipResult::ClippedToSingle(Triangle::<ClipSpace> {
@@ -129,7 +145,7 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
         });
     }
 
-    debug_assert!(out_vertices.len() == 4);
+    debug_assert_eq!(out_vertices.len(), 4);
 
     ClipResult::ClippedToDouble(
         Triangle::<ClipSpace> {
@@ -150,18 +166,9 @@ mod test {
     use crate::color::Color;
 
     static vertex_attributes: [VertexAttribute; 3] = [
-        VertexAttribute {
-            color: Color::red(),
-            uvs: [0.0, 0.0],
-        },
-        VertexAttribute {
-            color: Color::red(),
-            uvs: [0.0, 0.0],
-        },
-        VertexAttribute {
-            color: Color::red(),
-            uvs: [0.0, 0.0],
-        },
+        VertexAttribute{ color: Color::red(), uvs: [0.0, 0.0]},
+        VertexAttribute{ color: Color::red(), uvs: [0.0, 0.0]},
+        VertexAttribute{ color: Color::red(), uvs: [0.0, 0.0]},
     ];
 
     #[test]
@@ -181,9 +188,10 @@ mod test {
     }
 
     fn fully_inside_2() {
+
         let vertices = [
             Point4D::<ClipSpace>::new(-0.5, 1.0, 0.0, -1.0),
-            Point4D::<ClipSpace>::new(0.0, 1.0, 0.0, 2.0),
+            Point4D::<ClipSpace>::new(0.0, 1.5, 0.0, 2.0),
             Point4D::<ClipSpace>::new(0.5, 1.0, 0.0, 0.0),
         ];
 
@@ -194,6 +202,7 @@ mod test {
 
         assert!(std::matches!(try_clip(&tri), ClipResult::Inside));
     }
+
 
     #[test]
     fn cull_degenerate() {
@@ -207,6 +216,7 @@ mod test {
             vertices,
             vertex_attributes,
         };
+
         assert!(std::matches!(try_clip(&tri), ClipResult::Outside));
     }
 
@@ -225,11 +235,11 @@ mod test {
     }
 
     #[test]
-    fn cull_near() {
+    fn outside() {
         let vertices = [
-            Point4D::<ClipSpace>::new(-0.5, 1.0, 0.0, -1.0),
-            Point4D::<ClipSpace>::new(0.0, 1.0, 0.0, -2.0),
-            Point4D::<ClipSpace>::new(0.5, 1.0, 0.0, 0.0),
+            Point4D::<ClipSpace>::new(-0.6, 1.0, -1.0, 0.5),
+            Point4D::<ClipSpace>::new(0.6, 1.2, -2.0, 0.5),
+            Point4D::<ClipSpace>::new(0.6, 1.0, -1.5, 0.5),
         ];
 
         let tri = Triangle::<ClipSpace> {
@@ -238,4 +248,40 @@ mod test {
         };
         assert!(std::matches!(try_clip(&tri), ClipResult::Outside));
     }
+
+    #[test]
+    fn partial_right_side_overlap() {
+        let vertices = [
+            Point4D::<ClipSpace>::new(1.5, 0.0, 0.0, 2.0),
+            Point4D::<ClipSpace>::new(2.5, 1.0, 0.0, 2.0),
+            Point4D::<ClipSpace>::new(0.6, 1.0, 0.0, 2.0),
+        ];
+
+        // Note that the algorithm reorders
+        let expected0 = [
+            Point4D::<ClipSpace>::new(2.0, 1.0, 0.0, 2.0),
+            Point4D::<ClipSpace>::new(0.6, 1.0, 0.0, 2.0),
+            Point4D::<ClipSpace>::new(1.5, 0.0, 0.0, 2.0),
+        ];
+
+        let expected1 = [
+            Point4D::<ClipSpace>::new(1.5, 0.0, 0.0, 2.0),
+            Point4D::<ClipSpace>::new(2.0, 0.5, 0.0, 2.0),
+            Point4D::<ClipSpace>::new(2.0, 1.0, 0.0, 2.0),
+        ];
+
+        let tri = Triangle::<ClipSpace> {
+            vertices,
+            vertex_attributes,
+        };
+
+        match try_clip(&tri) {
+            ClipResult::ClippedToDouble(tri0, tri1) => {
+                assert_eq!(tri0.vertices, expected0);
+                assert_eq!(tri1.vertices, expected1);
+            }
+            _ => unreachable!(),
+        }
+    }
+
 }

@@ -1,4 +1,4 @@
-use core::ops::{Add, Mul, Sub};
+use core::ops::{Add, Mul, Sub, Neg};
 
 use crate::math::*;
 
@@ -113,6 +113,17 @@ where
 
     fn add(self, other: Vector<CS, { N }>) -> Self::Output {
         Self(self.0 + other)
+    }
+}
+
+impl<CS, const N: usize> Neg for Point<CS, { N }>
+where
+    CS: CoordinateSystem,
+{
+    type Output = Point<CS, { N }>;
+
+    fn neg(self) -> Self::Output {
+        Self(-self.0)
     }
 }
 
