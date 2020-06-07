@@ -166,9 +166,18 @@ mod test {
     use crate::color::Color;
 
     static vertex_attributes: [VertexAttribute; 3] = [
-        VertexAttribute{ color: Color::red(), uvs: [0.0, 0.0]},
-        VertexAttribute{ color: Color::red(), uvs: [0.0, 0.0]},
-        VertexAttribute{ color: Color::red(), uvs: [0.0, 0.0]},
+        VertexAttribute {
+            color: Color::red(),
+            uvs: [0.0, 0.0],
+        },
+        VertexAttribute {
+            color: Color::red(),
+            uvs: [0.0, 0.0],
+        },
+        VertexAttribute {
+            color: Color::red(),
+            uvs: [0.0, 0.0],
+        },
     ];
 
     #[test]
@@ -188,7 +197,6 @@ mod test {
     }
 
     fn fully_inside_2() {
-
         let vertices = [
             Point4D::<ClipSpace>::new(-0.5, 1.0, 0.0, -1.0),
             Point4D::<ClipSpace>::new(0.0, 1.5, 0.0, 2.0),
@@ -202,7 +210,6 @@ mod test {
 
         assert!(std::matches!(try_clip(&tri), ClipResult::Inside));
     }
-
 
     #[test]
     fn cull_degenerate() {
@@ -283,5 +290,4 @@ mod test {
             _ => unreachable!(),
         }
     }
-
 }

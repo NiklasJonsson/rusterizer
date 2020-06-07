@@ -1,4 +1,4 @@
-use core::ops::{Add, Mul, Sub, Neg};
+use core::ops::{Add, Mul, Neg, Sub};
 
 use crate::math::*;
 
