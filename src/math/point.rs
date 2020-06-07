@@ -1,4 +1,4 @@
-use core::ops::{Mul, Sub, Add};
+use core::ops::{Add, Mul, Sub};
 
 use crate::math::*;
 
@@ -105,13 +105,13 @@ where
     }
 }
 
-impl<CS, const N: usize> Add<Vector<CS, {N}>> for Point<CS, { N }>
+impl<CS, const N: usize> Add<Vector<CS, { N }>> for Point<CS, { N }>
 where
     CS: CoordinateSystem,
 {
     type Output = Point<CS, { N }>;
 
-    fn add(self, other: Vector<CS, {N}>) -> Self::Output {
+    fn add(self, other: Vector<CS, { N }>) -> Self::Output {
         Self(self.0 + other)
     }
 }

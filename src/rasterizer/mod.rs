@@ -12,7 +12,9 @@ use crate::rasterizer::buffers::*;
 
 use std::f32;
 
-pub fn triangle_2x_area<CS: CoordinateSystem, const N: usize>(vertices: &[Point<CS, { N }>]) -> f32 {
+pub fn triangle_2x_area<CS: CoordinateSystem, const N: usize>(
+    vertices: &[Point<CS, { N }>],
+) -> f32 {
     let v10 = vertices[1].xy() - vertices[0].xy();
     let v20 = vertices[2].xy() - vertices[0].xy();
     v10.cross(v20)
@@ -389,11 +391,11 @@ impl Rasterizer {
             match clipping::try_clip(&triangle) {
                 ClipResult::Outside => continue,
                 ClipResult::Inside => (),
-                ClipResult::ClippedToSingle( tri ) => {
+                ClipResult::ClippedToSingle(tri) => {
                     self.rasterize(&[tri], uniforms, fragment_shader);
                     continue;
                 }
-                ClipResult::ClippedToDouble( tri0, tri1) => {
+                ClipResult::ClippedToDouble(tri0, tri1) => {
                     self.rasterize(&[tri0, tri1], uniforms, fragment_shader);
                     continue;
                 }
