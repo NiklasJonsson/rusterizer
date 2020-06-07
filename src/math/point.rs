@@ -1,4 +1,4 @@
-use core::ops::{Mul, Sub};
+use core::ops::{Mul, Sub, Add};
 
 use crate::math::*;
 
@@ -44,6 +44,10 @@ where
 
     pub fn xy(&self) -> Point2D {
         Point2D::new(self.x(), self.y())
+    }
+
+    pub fn to_vec(self) -> Vector<CS, N> {
+        self.0
     }
 }
 
@@ -98,6 +102,17 @@ where
 
     fn mul(self, other: f32) -> Self::Output {
         Self(self.0 * other)
+    }
+}
+
+impl<CS, const N: usize> Add<Vector<CS, {N}>> for Point<CS, { N }>
+where
+    CS: CoordinateSystem,
+{
+    type Output = Point<CS, { N }>;
+
+    fn add(self, other: Vector<CS, {N}>) -> Self::Output {
+        Self(self.0 + other)
     }
 }
 

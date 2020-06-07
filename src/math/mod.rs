@@ -34,7 +34,8 @@ pub struct CameraSpace;
 #[derive(Copy, Clone)]
 pub struct ClipSpace;
 
-/// Normalized Device Coordinates, x and y have been divided by the the clip space w coordinate
+/// Normalized Device Coordinates, x and y have been divided by the the clip space w coordinate.
+/// All axes range from -1, 1
 #[derive(Copy, Clone)]
 pub struct NDC;
 
