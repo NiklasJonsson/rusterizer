@@ -5,13 +5,16 @@ use crate::uniform::*;
 
 mod bounding_box;
 mod buffers;
+mod clipping;
 
 use crate::rasterizer::bounding_box::*;
 use crate::rasterizer::buffers::*;
 
 use std::f32;
 
-fn triangle_2x_area<CS: CoordinateSystem, const N: usize>(vertices: &[Point<CS, { N }>]) -> f32 {
+pub fn triangle_2x_area<CS: CoordinateSystem, const N: usize>(
+    vertices: &[Point<CS, { N }>],
+) -> f32 {
     let v10 = vertices[1].xy() - vertices[0].xy();
     let v20 = vertices[2].xy() - vertices[0].xy();
     v10.cross(v20)
@@ -170,8 +173,6 @@ impl EdgeFunctions {
         self.coverage_mask.any()
     }
 }
-const CULL_DEGENERATE_TRIANGLE_AREA_EPS: f32 = 0.000001;
-
 // Implicitly in 2D Screen space
 #[derive(Debug, Clone)]
 struct RasterizerTriangle {
@@ -379,11 +380,6 @@ impl Rasterizer {
         }
     }
 
-    fn can_cull(vertices: &[Point4D<ClipSpace>]) -> bool {
-        vertices.iter().all(|x| x.w() <= 0.0)
-            || triangle_2x_area(vertices).abs() < CULL_DEGENERATE_TRIANGLE_AREA_EPS
-    }
-
     pub fn rasterize(
         &mut self,
         triangles: &[Triangle<ClipSpace>],
@@ -391,8 +387,14 @@ impl Rasterizer {
         fragment_shader: crate::render::FragmentShader,
     ) {
         for triangle in triangles {
-            if Rasterizer::can_cull(&triangle.vertices) {
-                continue;
+            use clipping::ClipResult;
+            match clipping::try_clip(&triangle) {
+                ClipResult::Outside => continue,
+                ClipResult::Inside => (),
+                ClipResult::Clipped(tris) => {
+                    self.rasterize(&tris, uniforms, fragment_shader);
+                    continue;
+                }
             }
 
             let triangle = Rasterizer::perspective_divide(triangle);
@@ -478,59 +480,8 @@ impl Rasterizer {
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use super::*;
-
-    #[test]
-    fn no_culling() {
-        let vertices = [
-            Point4D::<ClipSpace>::new(-0.5, 0.0, 0.0, 1.0),
-            Point4D::<ClipSpace>::new(0.0, 1.0, 0.0, 1.0),
-            Point4D::<ClipSpace>::new(0.5, 0.0, 0.0, 1.0),
-        ];
-
-        assert_eq!(Rasterizer::can_cull(&vertices), false);
-
-        // Note that this should probably be partially culled
-        // and reconstructed
-        let vertices = [
-            Point4D::<ClipSpace>::new(-0.5, 1.0, 0.0, -1.0),
-            Point4D::<ClipSpace>::new(0.0, 1.0, 0.0, 2.0),
-            Point4D::<ClipSpace>::new(0.5, 1.0, 0.0, 0.0),
-        ];
-
-        assert_eq!(Rasterizer::can_cull(&vertices), true);
-    }
-
-    #[test]
-    fn cull_degenerate() {
-        let vertices = [
-            Point4D::<ClipSpace>::new(0.0, 0.0, 0.0, 1.0),
-            Point4D::<ClipSpace>::new(0.0, 1.0, 0.0, 1.0),
-            Point4D::<ClipSpace>::new(0.0, 0.0, 0.0, 1.0),
-        ];
-
-        assert_eq!(Rasterizer::can_cull(&vertices), true);
-
-        let vertices = [
-            Point4D::<ClipSpace>::new(-0.5, 1.0, 0.0, 1.0),
-            Point4D::<ClipSpace>::new(0.0, 1.0, 0.0, 1.0),
-            Point4D::<ClipSpace>::new(0.5, 1.0, 0.0, 1.0),
-        ];
-
-        assert_eq!(Rasterizer::can_cull(&vertices), true);
-    }
-
-    #[test]
-    fn cull_near() {
-        let vertices = [
-            Point4D::<ClipSpace>::new(-0.5, 1.0, 0.0, -1.0),
-            Point4D::<ClipSpace>::new(0.0, 1.0, 0.0, -2.0),
-            Point4D::<ClipSpace>::new(0.5, 1.0, 0.0, 0.0),
-        ];
-
-        assert_eq!(Rasterizer::can_cull(&vertices), true);
-    }
 
     #[test]
     fn perspective_divide() {

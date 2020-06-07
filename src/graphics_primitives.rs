@@ -1,6 +1,7 @@
 use core::ops::Add;
 use core::ops::Div;
 use core::ops::Mul;
+use core::ops::Sub;
 
 use crate::color::Color;
 use crate::math::*;
@@ -49,7 +50,18 @@ impl Add for VertexAttribute {
     }
 }
 
+impl Sub for VertexAttribute {
+    type Output = Self;
+    fn sub(self, other: VertexAttribute) -> Self::Output {
+        let color = self.color - other.color;
+        let uvs = [self.uvs[0] - other.uvs[0], self.uvs[1] - other.uvs[1]];
+
+        Self { color, uvs }
+    }
+}
+
 const N_VERTICES: usize = 3;
+#[derive(Clone)]
 pub struct Triangle<CS>
 where
     CS: CoordinateSystem,

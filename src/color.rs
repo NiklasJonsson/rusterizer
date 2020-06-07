@@ -1,6 +1,7 @@
 use core::ops::Add;
 use core::ops::Div;
 use core::ops::Mul;
+use core::ops::Sub;
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct Color {
@@ -27,7 +28,7 @@ impl Color {
         }
     }
 
-    pub fn red() -> Self {
+    pub const fn red() -> Self {
         Color {
             r: 1.0,
             g: 0.0,
@@ -35,7 +36,7 @@ impl Color {
             a: 1.0,
         }
     }
-    pub fn green() -> Self {
+    pub const fn green() -> Self {
         Color {
             r: 0.0,
             g: 1.0,
@@ -43,7 +44,7 @@ impl Color {
             a: 1.0,
         }
     }
-    pub fn blue() -> Self {
+    pub const fn blue() -> Self {
         Color {
             r: 0.0,
             g: 0.0,
@@ -52,7 +53,7 @@ impl Color {
         }
     }
 
-    pub fn white() -> Self {
+    pub const fn white() -> Self {
         Color {
             r: 1.0,
             g: 1.0,
@@ -61,7 +62,7 @@ impl Color {
         }
     }
 
-    pub fn grayscale(v: f32) -> Self {
+    pub const fn grayscale(v: f32) -> Self {
         Color {
             r: v,
             g: v,
@@ -97,7 +98,7 @@ impl Div<f32> for Color {
     }
 }
 
-impl Add<Color> for Color {
+impl Add for Color {
     type Output = Color;
     fn add(self, other: Color) -> Color {
         Color {
@@ -105,6 +106,18 @@ impl Add<Color> for Color {
             g: self.g + other.g,
             b: self.b + other.b,
             a: self.a + other.a,
+        }
+    }
+}
+
+impl Sub for Color {
+    type Output = Color;
+    fn sub(self, other: Color) -> Color {
+        Color {
+            r: self.r - other.r,
+            g: self.g - other.g,
+            b: self.b - other.b,
+            a: self.a - other.a,
         }
     }
 }
