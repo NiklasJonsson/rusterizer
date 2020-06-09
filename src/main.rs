@@ -102,6 +102,7 @@ fn main() {
 
         let diff = start.elapsed().as_secs_f32();
         //matrices[0] = math::rotate::<math::WorldSpace>(diff, diff, 0.0);
+        matrices[0] = math::translate::<math::WorldSpace>(diff, 0.0, 0.0);
         matrices[1] = math::rotate::<math::WorldSpace>(diff, 0.0, std::f32::consts::FRAC_PI_4)
             * math::translate::<math::WorldSpace>(0.0, 3.0, 0.0);
 

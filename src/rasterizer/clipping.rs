@@ -73,22 +73,29 @@ fn intersect(
 }
 
 pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
-    let outside = |v: &Point4D<ClipSpace>| {
-        (v.x().abs() > v.w() && v.y().abs() > v.w() && v.z().abs() > v.w()) || (v.w() < 0.0)
-    };
-    if triangle.vertices.iter().all(outside) {
+    let mut all_inside = [true; 3];
+    let mut all_outside = [true; 3];
+    for v in triangle.vertices.iter() {
+        all_inside[0] &= v.x().abs() < v.w();
+        all_inside[1] &= v.y().abs() < v.w();
+        all_inside[2] &= v.z().abs() < v.w();
+
+        all_outside[0] &= v.x().abs() > v.w();
+        all_outside[1] &= v.y().abs() > v.w();
+        all_outside[2] &= v.z().abs() > v.w();
+    }
+
+    if all_outside.iter().any(|&x| x) {
         return ClipResult::Outside;
     }
+
+    if all_inside.iter().all(|&x| x) {
+        return ClipResult::Inside;
+    }
+
 
     if super::triangle_2x_area(&triangle.vertices).abs() < CULL_DEGENERATE_TRIANGLE_AREA_EPS {
         return ClipResult::Outside;
-    }
-
-    let inside = |v: &Point4D<ClipSpace>| {
-        v.x().abs() <= v.w() && v.y().abs() <= v.w() && v.z().abs() <= v.w()
-    };
-    if triangle.vertices.iter().all(inside) {
-        return ClipResult::Inside;
     }
 
     // With these definitions, the positive half space points to inside the bounding box.
