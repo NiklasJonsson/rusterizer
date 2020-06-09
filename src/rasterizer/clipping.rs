@@ -68,7 +68,7 @@ fn intersect(
     debug_assert!(p1_signed_dist > 0.0);
     Intersection::SecondInside {
         point: intersection,
-        line_param: -line_param,
+        line_param,
     }
 }
 
@@ -290,4 +290,36 @@ mod test {
             _ => unreachable!(),
         }
     }
+
+    #[test]
+    fn partial_right_side_overlap_single() {
+        let vertices = [
+            Point4D::<ClipSpace>::new(2.4, 0.0, 0.0, 2.0),
+            Point4D::<ClipSpace>::new(2.5, 1.0, 0.0, 2.0),
+            Point4D::<ClipSpace>::new(0.6, 1.0, 0.0, 2.0),
+        ];
+
+        // Note that the algorithm reorders
+        let expected = [
+            Point4D::<ClipSpace>::new(1.5, 1.0, 0.0, 2.0),
+            Point4D::<ClipSpace>::new(0.5, 2.1, 0.0, 2.0),
+            Point4D::<ClipSpace>::new(0.6, 2.2, 0.0, 2.0),
+        ];
+
+        let tri = Triangle::<ClipSpace> {
+            vertices,
+            vertex_attributes,
+        };
+
+        match try_clip(&tri) {
+            ClipResult::ClippedToSingle(tri) => {
+                assert_eq!(tri.vertices, expected);
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    // Test TODO:
+    // - parallel with clip volume
+    // - All outside but covers the whole clipspace
 }
