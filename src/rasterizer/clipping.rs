@@ -50,7 +50,10 @@ fn intersect(
 
     // This means the line and the plane is parallell
     if line_param_bottom == 0.0 {
-        // TODO: When is inside?
+        // If this is true, the point fulfills the plane equation and is inside the plane
+        if line_param_top == 0.0 {
+            return Intersection::BothInside;
+        }
         return Intersection::BothOutside;
     }
 
@@ -76,23 +79,31 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
         return ClipResult::Outside;
     }
 
-    let mut all_inside = [true; 3];
-    let mut all_outside = [true; 3];
+    let mut inside = [[true; 2]; 3];
+    let mut outside = [[true; 2]; 3];
     for v in triangle.vertices.iter() {
-        all_inside[0] &= v.x().abs() <= v.w();
-        all_inside[1] &= v.y().abs() <= v.w();
-        all_inside[2] &= v.z().abs() <= v.w();
+        inside[0][0] &= v.x() >= -v.w();
+        inside[1][0] &= v.y() >= -v.w();
+        inside[2][0] &= v.z() >= -v.w();
 
-        all_outside[0] &= v.x().abs() > v.w();
-        all_outside[1] &= v.y().abs() > v.w();
-        all_outside[2] &= v.z().abs() > v.w();
+        inside[0][1] &= v.x() <= v.w();
+        inside[1][1] &= v.y() <= v.w();
+        inside[2][1] &= v.z() <= v.w();
+
+        outside[0][0] &= v.x() < -v.w();
+        outside[1][0] &= v.y() < -v.w();
+        outside[2][0] &= v.z() < -v.w();
+
+        outside[0][1] &= v.x() > v.w();
+        outside[1][1] &= v.y() > v.w();
+        outside[2][1] &= v.z() > v.w();
     }
 
-    if all_outside.iter().any(|&x| x) {
+    if outside.iter().any(|&x| x.iter().any(|&x| x)) {
         return ClipResult::Outside;
     }
 
-    if all_inside.iter().all(|&x| x) {
+    if inside.iter().all(|&x| x.iter().all(|&x| x)) {
         return ClipResult::Inside;
     }
 
@@ -398,6 +409,26 @@ mod test {
         assert!(std::matches!(try_clip(&tri), ClipResult::Outside));
     }
 
-    // Test TODO:
-    // - All outside but covers the whole clipspace
+    #[test]
+    fn complete_coverage() {
+        // Initially some points are inside each axis so this triangle does not get caught
+        // by the early checks. After a few rounds of clipping though, it ends up with 0 inside.
+        let vertices = [
+            Point4D::<ClipSpace>::new(-10.70005131, 10.0005131, 1.3, 3.29994869),
+            Point4D::<ClipSpace>::new(15.70005131, 0.0, 1.32306385, 1.3),
+            Point4D::<ClipSpace>::new(-10.70005131, -10.70005131, 1.3, 3.29994869),
+        ];
+
+        let tri = Triangle::<ClipSpace> {
+            vertices,
+            vertex_attributes,
+        };
+        match try_clip(&tri) {
+            ClipResult::Clipped(tris) => {
+                assert_eq!(tris.len(), 2);
+                //assert_eq!(tris[0].vertices, expected);
+            }
+            _ => unreachable!(),
+        }
+    }
 }
