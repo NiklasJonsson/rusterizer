@@ -60,14 +60,14 @@ fn intersect(
     let line_param = line_param_top / line_param_bottom;
     let intersection = *p0 + (*p1 - *p0) * line_param;
 
-    if p0_signed_dist > 0.0 {
+    if p0_signed_dist >= 0.0 {
         return Intersection::FirstInside {
             point: intersection,
             line_param,
         };
     }
 
-    debug_assert!(p1_signed_dist > 0.0);
+    debug_assert!(p1_signed_dist >= 0.0);
     Intersection::SecondInside {
         point: intersection,
         line_param,
@@ -417,6 +417,27 @@ mod test {
             Point4D::<ClipSpace>::new(-10.70005131, 10.0005131, 1.3, 3.29994869),
             Point4D::<ClipSpace>::new(15.70005131, 0.0, 1.32306385, 1.3),
             Point4D::<ClipSpace>::new(-10.70005131, -10.70005131, 1.3, 3.29994869),
+        ];
+
+        let tri = Triangle::<ClipSpace> {
+            vertices,
+            vertex_attributes,
+        };
+        match try_clip(&tri) {
+            ClipResult::Clipped(tris) => {
+                assert_eq!(tris.len(), 2);
+                //assert_eq!(tris[0].vertices, expected);
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn small_triangle() {
+        let vertices = [
+            Point4D::<ClipSpace>::new(1.69605124, -2.40628147, 0.420414984, 2.40628147),
+            Point4D::<ClipSpace>::new(1.68917572, -2.40170431, 0.415791571, 2.40170407),
+            Point4D::<ClipSpace>::new(1.68629396, -2.36931682, 0.415715098, 2.40162849),
         ];
 
         let tri = Triangle::<ClipSpace> {

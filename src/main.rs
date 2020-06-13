@@ -19,8 +19,8 @@ use crate::graphics_primitives::VertexAttribute;
 use crate::render::*;
 use crate::uniform::Uniforms;
 
-const WIDTH: usize = 800;
-const HEIGHT: usize = 800;
+const WIDTH: usize = 1280;
+const HEIGHT: usize = 720;
 
 enum FS {
     Texture,
@@ -81,8 +81,7 @@ fn main() {
     let tex = texture::Texture::from_png_file("images/checkerboard.png");
     renderer.uniforms().bind_texture(0, tex);
 
-    //let meshes = [mesh::cube(1.0), mesh::sphere(0.5)];
-    let meshes = [mesh::triangle()];
+    let meshes = [mesh::cube(1.0), mesh::sphere(0.5)];
     let mut matrices = [math::Mat4::<math::WorldSpace>::identity(); 2];
 
     let vertex_shader = |uniforms: &Uniforms, vertex: &math::Point3D<math::WorldSpace>| {
@@ -101,8 +100,7 @@ fn main() {
         now = Instant::now();
 
         let diff = start.elapsed().as_secs_f32();
-        //matrices[0] = math::rotate::<math::WorldSpace>(diff, diff, 0.0);
-        matrices[0] = math::translate::<math::WorldSpace>(diff, 0.0, 0.0);
+        matrices[0] = math::rotate::<math::WorldSpace>(diff, diff, 0.0);
         matrices[1] = math::rotate::<math::WorldSpace>(diff, 0.0, std::f32::consts::FRAC_PI_4)
             * math::translate::<math::WorldSpace>(0.0, 3.0, 0.0);
 
