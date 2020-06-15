@@ -7,5 +7,6 @@ Features:
  * Perspective correct interpolation (e.g. texture coordinates)
  * MSAA
  * Triangle clipping & reconstruction
+ * Bilinear texture filtering
 
 Note: Needs nightly rust
