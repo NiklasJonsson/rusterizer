@@ -33,7 +33,7 @@ fn intersect(
 ) -> Intersection {
     let p0_signed_dist = plane_normal.dot(p0.to_vec());
     let p1_signed_dist = plane_normal.dot(p1.to_vec());
-    if p0_signed_dist > 0.0 && p1_signed_dist > 0.0 {
+    if p0_signed_dist >= 0.0 && p1_signed_dist >= 0.0 {
         return Intersection::BothInside;
     }
 
@@ -48,7 +48,7 @@ fn intersect(
     let line_param_top = -plane_normal.dot(p0.to_vec());
     let line_param_bottom = plane_normal.dot(*p1 - *p0);
 
-    // This means the line and the plane is parallell
+    // This means the line and the plane is parallel
     if line_param_bottom == 0.0 {
         // If this is true, the point fulfills the plane equation and is inside the plane
         if line_param_top == 0.0 {
@@ -178,6 +178,15 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn intersect_0() {
+        let clip_plane = vec4::<ClipSpace>(0.0, 1.0, 0.0, 1.0);
+        let p0 = Point4D::<ClipSpace>::new(3.93749976, -7.0, 5.06030178, 7.0);
+        let p1 = Point4D::<ClipSpace>::new(6.0, 7.0, 5.06030178, 7.0);
+
+        assert!(std::matches!(intersect(&clip_plane, &p0, &p1), Intersection::BothInside));
+    }
 
     use crate::color::Color;
 
@@ -447,7 +456,6 @@ mod test {
         match try_clip(&tri) {
             ClipResult::Clipped(tris) => {
                 assert_eq!(tris.len(), 2);
-                //assert_eq!(tris[0].vertices, expected);
             }
             _ => unreachable!(),
         }
