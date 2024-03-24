@@ -386,6 +386,17 @@ impl Rasterizer {
         uniforms: &Uniforms,
         fragment_shader: crate::render::FragmentShader,
     ) {
+        // TODO: Start here
+        // The app crashes due to the self.rasterize ending up in infinite recursion.
+        // Though it was a while since I looked at this, it seems like:
+        // 1. I wasn't thinking when I made this recursive!?
+        // 2. The clipping algo ends up creating some triangles that are not deemed inside of the clipping volume
+        // To fix this:
+        // 1. Write the repro test case in `mod clipping`
+        // 2. Readup on the clipping algo and fix the test case.
+        // 3. Make this not recursive.
+        // Both 2 and 3 might fix this issue but 3. might hide an issue in 2 though 3 should be done anyhow.
+
         for triangle in triangles {
             use clipping::ClipResult;
             match clipping::try_clip(triangle) {

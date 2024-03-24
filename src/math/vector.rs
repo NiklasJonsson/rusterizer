@@ -209,7 +209,7 @@ impl<CS: CoordinateSystem> Vec3<CS> {
 }
 
 pub type Vec4<CS> = Vector<CS, 4>;
-pub fn vec4<CS: CoordinateSystem>(x: f32, y: f32, z: f32, w: f32) -> Vec4<CS> {
+pub const fn vec4<CS: CoordinateSystem>(x: f32, y: f32, z: f32, w: f32) -> Vec4<CS> {
     Vec4::<CS> {
         arr: [x, y, z, w],
         coordinate_system: PhantomData {},

@@ -15,11 +15,11 @@ enum Intersection {
     BothOutside,
     BothInside,
     FirstInside {
-        point: Point4D<ClipSpace>,
+        intersection: Point4D<ClipSpace>,
         line_param: f32,
     },
     SecondInside {
-        point: Point4D<ClipSpace>,
+        intersection: Point4D<ClipSpace>,
         line_param: f32,
     },
 }
@@ -62,14 +62,14 @@ fn intersect(
 
     if p0_signed_dist >= 0.0 {
         return Intersection::FirstInside {
-            point: intersection,
+            intersection,
             line_param,
         };
     }
 
     debug_assert!(p1_signed_dist >= 0.0);
     Intersection::SecondInside {
-        point: intersection,
+        intersection,
         line_param,
     }
 }
@@ -109,7 +109,7 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
 
     // With these definitions, the positive half space points to inside the bounding box.
     // => A point is inside for dot() > 0.0
-    let clip_planes: [Vec4<ClipSpace>; 6] = [
+    const CLIP_PLANES: [Vec4<ClipSpace>; 6] = [
         vec4(1.0, 0.0, 0.0, 1.0),
         vec4(-1.0, 0.0, 0.0, 1.0),
         vec4(0.0, 1.0, 0.0, 1.0),
@@ -122,27 +122,34 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
     let mut out_attrs: Vec<VertexAttribute> = triangle.vertex_attributes.to_vec();
 
     // Sotherland-Hodgeman
-    for clip_plane in clip_planes.iter() {
+    for clip_plane in CLIP_PLANES.iter() {
         let in_vertices = out_vertices.clone();
         let in_attrs = out_attrs.clone();
         out_attrs.clear();
         out_vertices.clear();
         for (i, (vert, attr)) in in_vertices.iter().zip(in_attrs.iter()).enumerate() {
-            let prev_vert = in_vertices[(i + in_vertices.len() - 1) % in_vertices.len()];
-            let prev_attr = in_attrs[(i + in_vertices.len() - 1) % in_attrs.len()];
+            let prev_i = (i + in_vertices.len() - 1) % in_vertices.len();
+            let prev_vert = in_vertices[prev_i];
+            let prev_attr = in_attrs[prev_i];
             match intersect(clip_plane, &prev_vert, vert) {
                 Intersection::BothOutside => continue,
                 Intersection::BothInside => {
                     out_vertices.push(*vert);
                     out_attrs.push(*attr);
                 }
-                Intersection::FirstInside { point, line_param } => {
-                    out_vertices.push(point);
+                Intersection::FirstInside {
+                    intersection,
+                    line_param,
+                } => {
+                    out_vertices.push(intersection);
                     // Interpolate
                     out_attrs.push((*attr - prev_attr) * line_param + prev_attr);
                 }
-                Intersection::SecondInside { point, line_param } => {
-                    out_vertices.push(point);
+                Intersection::SecondInside {
+                    intersection,
+                    line_param,
+                } => {
+                    out_vertices.push(intersection);
                     // Interpolate
                     out_attrs.push((*attr - prev_attr) * line_param + prev_attr);
                     out_vertices.push(*vert);
@@ -461,6 +468,29 @@ mod test {
                 assert_eq!(tris.len(), 2);
             }
             _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn test_clipped_tris_are_inside() {
+        // Test that clipping the result of the clipping are not clipped again...
+        let vertices = [
+            Point4D::<ClipSpace>::new(2.07009363, -3.05162668, 0.985171258, 2.96541810),
+            Point4D::<ClipSpace>::new(2.07487488, -2.61568260, 1.03832412, 3.01804209),
+            Point4D::<ClipSpace>::new(2.07427669, -2.86637640, 1.15170527, 3.13029504),
+        ];
+
+        let tri = Triangle {
+            vertices,
+            vertex_attributes: VERTEX_ATTRIBUTES,
+        };
+
+        let ClipResult::Clipped(clipped) = try_clip(&tri) else {
+            unreachable!("Expected the triangle to be clipped");
+        };
+
+        for t in clipped {
+            assert!(std::matches!(try_clip(&t), ClipResult::Inside));
         }
     }
 }
