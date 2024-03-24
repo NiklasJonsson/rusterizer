@@ -165,7 +165,7 @@ impl EdgeFunctions {
                 if normal.y() < 0.0 {
                     return true;
                 }
-                return false;
+                false
             })
     }
 
@@ -388,7 +388,7 @@ impl Rasterizer {
     ) {
         for triangle in triangles {
             use clipping::ClipResult;
-            match clipping::try_clip(&triangle) {
+            match clipping::try_clip(triangle) {
                 ClipResult::Outside => continue,
                 ClipResult::Inside => (),
                 ClipResult::Clipped(tris) => {
@@ -743,18 +743,18 @@ mod test {
         let e = rast_tri.edge_functions.eval_single(150.0, 225.0);
         assert!(EdgeFunctions::inside(&rast_tri.edge_functions.normals, &e));
         assert_eq!(e[0], 0.0);
-        assert_eq!(rast_tri.edge_functions.normals[0].x() > 0.0, true);
+        assert!(rast_tri.edge_functions.normals[0].x() > 0.0);
 
         let e = rast_tri.edge_functions.eval_single(250.0, 225.0);
         assert!(!EdgeFunctions::inside(&rast_tri.edge_functions.normals, &e));
         assert_eq!(e[1], 0.0);
-        assert_eq!(rast_tri.edge_functions.normals[1].x() < 0.0, true);
+        assert!(rast_tri.edge_functions.normals[1].x() < 0.0);
 
         let e = rast_tri.edge_functions.eval_single(250.0, 300.0);
         assert!(EdgeFunctions::inside(&rast_tri.edge_functions.normals, &e));
         assert_eq!(e[2], 0.0);
-        assert_eq!(rast_tri.edge_functions.normals[2].x() == 0.0, true);
-        assert_eq!(rast_tri.edge_functions.normals[2].y() < 0.0, true);
+        assert_eq!(rast_tri.edge_functions.normals[2].x(), 0.0);
+        assert!(rast_tri.edge_functions.normals[2].y() < 0.0);
     }
 
     #[test]

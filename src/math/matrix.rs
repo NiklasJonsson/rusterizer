@@ -10,7 +10,7 @@ where
     CSF: CoordinateSystem,
     CST: CoordinateSystem,
 {
-    array: [[f32; { N }]; { N }],
+    array: [[f32; N]; N],
     _from_coordinate_space: PhantomData<CSF>,
     _to_coordinate_space: PhantomData<CST>,
 }

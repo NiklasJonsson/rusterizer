@@ -130,7 +130,7 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
         for (i, (vert, attr)) in in_vertices.iter().zip(in_attrs.iter()).enumerate() {
             let prev_vert = in_vertices[(i + in_vertices.len() - 1) % in_vertices.len()];
             let prev_attr = in_attrs[(i + in_vertices.len() - 1) % in_attrs.len()];
-            match intersect(clip_plane, &prev_vert, &vert) {
+            match intersect(clip_plane, &prev_vert, vert) {
                 Intersection::BothOutside => continue,
                 Intersection::BothInside => {
                     out_vertices.push(*vert);
@@ -154,7 +154,7 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
 
     // This can happen if even though initially, one or more points are inside, through clipping,
     // they end up outside.
-    if out_vertices.len() == 0 {
+    if out_vertices.is_empty() {
         return ClipResult::Outside;
     }
 
@@ -164,7 +164,7 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
     let mut out = Vec::with_capacity(out_vertices.len() - 2);
 
     for i in 0..out_vertices.len() - 2 {
-        out.push(Triangle::<ClipSpace> {
+        out.push(Triangle {
             vertices: [out_vertices[0], out_vertices[i + 1], out_vertices[i + 2]],
             vertex_attributes: [out_attrs[0], out_attrs[i + 1], out_attrs[i + 2]],
         });
@@ -185,12 +185,15 @@ mod test {
         let p0 = Point4D::<ClipSpace>::new(3.93749976, -7.0, 5.06030178, 7.0);
         let p1 = Point4D::<ClipSpace>::new(6.0, 7.0, 5.06030178, 7.0);
 
-        assert!(std::matches!(intersect(&clip_plane, &p0, &p1), Intersection::BothInside));
+        assert!(std::matches!(
+            intersect(&clip_plane, &p0, &p1),
+            Intersection::BothInside
+        ));
     }
 
     use crate::color::Color;
 
-    static vertex_attributes: [VertexAttribute; 3] = [
+    const VERTEX_ATTRIBUTES: [VertexAttribute; 3] = [
         VertexAttribute {
             color: Color::red(),
             uvs: [0.0, 0.0],
@@ -213,9 +216,9 @@ mod test {
             Point4D::<ClipSpace>::new(0.5, 0.0, 0.0, 1.0),
         ];
 
-        let tri = Triangle::<ClipSpace> {
+        let tri = Triangle {
             vertices,
-            vertex_attributes,
+            vertex_attributes: VERTEX_ATTRIBUTES,
         };
 
         assert!(std::matches!(try_clip(&tri), ClipResult::Inside));
@@ -228,9 +231,9 @@ mod test {
             Point4D::<ClipSpace>::new(0.5, 1.0, 0.0, 0.0),
         ];
 
-        let tri = Triangle::<ClipSpace> {
+        let tri = Triangle {
             vertices,
-            vertex_attributes,
+            vertex_attributes: VERTEX_ATTRIBUTES,
         };
 
         assert!(std::matches!(try_clip(&tri), ClipResult::Inside));
@@ -244,9 +247,9 @@ mod test {
             Point4D::<ClipSpace>::new(0.0, 0.0, 0.0, 1.0),
         ];
 
-        let tri = Triangle::<ClipSpace> {
+        let tri = Triangle {
             vertices,
-            vertex_attributes,
+            vertex_attributes: VERTEX_ATTRIBUTES,
         };
 
         assert!(std::matches!(try_clip(&tri), ClipResult::Outside));
@@ -259,9 +262,9 @@ mod test {
             Point4D::<ClipSpace>::new(0.5, 1.0, 0.0, 1.0),
         ];
 
-        let tri = Triangle::<ClipSpace> {
+        let tri = Triangle {
             vertices,
-            vertex_attributes,
+            vertex_attributes: VERTEX_ATTRIBUTES,
         };
         assert!(std::matches!(try_clip(&tri), ClipResult::Outside));
     }
@@ -274,9 +277,9 @@ mod test {
             Point4D::<ClipSpace>::new(0.6, 1.0, -1.5, 0.5),
         ];
 
-        let tri = Triangle::<ClipSpace> {
+        let tri = Triangle {
             vertices,
-            vertex_attributes,
+            vertex_attributes: VERTEX_ATTRIBUTES,
         };
         assert!(std::matches!(try_clip(&tri), ClipResult::Outside));
     }
@@ -301,9 +304,9 @@ mod test {
             Point4D::<ClipSpace>::new(0.6, 1.0, 0.0, 2.0),
         ];
 
-        let tri = Triangle::<ClipSpace> {
+        let tri = Triangle {
             vertices,
-            vertex_attributes,
+            vertex_attributes: VERTEX_ATTRIBUTES,
         };
 
         match try_clip(&tri) {
@@ -342,9 +345,9 @@ mod test {
             Point4D::<ClipSpace>::new(-5.0629444, 5.0629444, 5.060302, 7.0),
         ];
 
-        let tri = Triangle::<ClipSpace> {
+        let tri = Triangle {
             vertices,
-            vertex_attributes,
+            vertex_attributes: VERTEX_ATTRIBUTES,
         };
 
         match try_clip(&tri) {
@@ -372,9 +375,9 @@ mod test {
             Point4D::<ClipSpace>::new(0.6, 1.0, 0.0, 2.0),
         ];
 
-        let tri = Triangle::<ClipSpace> {
+        let tri = Triangle {
             vertices,
-            vertex_attributes,
+            vertex_attributes: VERTEX_ATTRIBUTES,
         };
 
         match try_clip(&tri) {
@@ -394,9 +397,9 @@ mod test {
             Point4D::<ClipSpace>::new(7.0, -1.0, 5.06030178, 7.0),
         ];
 
-        let tri = Triangle::<ClipSpace> {
+        let tri = Triangle {
             vertices,
-            vertex_attributes,
+            vertex_attributes: VERTEX_ATTRIBUTES,
         };
         assert!(std::matches!(try_clip(&tri), ClipResult::Inside));
     }
@@ -411,9 +414,9 @@ mod test {
             Point4D::<ClipSpace>::new(-2.70005131, -4.70005131, 1.32306385, 3.29994869),
         ];
 
-        let tri = Triangle::<ClipSpace> {
+        let tri = Triangle {
             vertices,
-            vertex_attributes,
+            vertex_attributes: VERTEX_ATTRIBUTES,
         };
         assert!(std::matches!(try_clip(&tri), ClipResult::Outside));
     }
@@ -428,9 +431,9 @@ mod test {
             Point4D::<ClipSpace>::new(-10.70005131, -10.70005131, 1.3, 3.29994869),
         ];
 
-        let tri = Triangle::<ClipSpace> {
+        let tri = Triangle {
             vertices,
-            vertex_attributes,
+            vertex_attributes: VERTEX_ATTRIBUTES,
         };
         match try_clip(&tri) {
             ClipResult::Clipped(tris) => {
@@ -449,9 +452,9 @@ mod test {
             Point4D::<ClipSpace>::new(1.68629396, -2.36931682, 0.415715098, 2.40162849),
         ];
 
-        let tri = Triangle::<ClipSpace> {
+        let tri = Triangle {
             vertices,
-            vertex_attributes,
+            vertex_attributes: VERTEX_ATTRIBUTES,
         };
         match try_clip(&tri) {
             ClipResult::Clipped(tris) => {

@@ -63,10 +63,10 @@ impl Texture {
     }
 
     pub fn sample(&self, u: f32, v: f32) -> Color {
-        debug_assert!(u >= 0.0 && u <= 1.0, "Incorrect u coordinate: {}", u);
-        debug_assert!(v >= 0.0 && v <= 1.0, "Incorrect v coordinate: {}", v);
-        let x = (u * (self.width - 1) as f32);
-        let y = (v * (self.height - 1) as f32);
+        debug_assert!((0.0..=1.0).contains(&u), "Incorrect u coordinate: {}", u);
+        debug_assert!((0.0..=1.0).contains(&v), "Incorrect v coordinate: {}", v);
+        let x = u * (self.width - 1) as f32;
+        let y = v * (self.height - 1) as f32;
 
         let topleft = self.read_texel(x.floor() as usize, y.floor() as usize);
         let topright = self.read_texel(x.ceil() as usize, y.floor() as usize);

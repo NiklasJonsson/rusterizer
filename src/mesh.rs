@@ -137,7 +137,7 @@ where
 
     let attributes = colors
         .into_iter()
-        .zip(tex_coords.into_iter())
+        .zip(tex_coords)
         .map(|v| v.into())
         .collect::<Vec<_>>();
 

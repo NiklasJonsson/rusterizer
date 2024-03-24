@@ -1,7 +1,3 @@
-#![feature(const_generics)]
-#![feature(unsized_locals)]
-#![feature(clamp)]
-
 use std::time::Instant;
 
 mod camera;
@@ -106,7 +102,7 @@ fn main() {
 
         for (mesh, mat) in meshes.iter().zip(matrices.iter()) {
             renderer.uniforms().write_block().world = *mat;
-            renderer.render(&mesh, vertex_shader, fragment_shader);
+            renderer.render(mesh, vertex_shader, fragment_shader);
         }
 
         match renderer.display() {

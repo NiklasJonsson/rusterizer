@@ -6,7 +6,6 @@ pub const CLEAR_COLOR: u32 = 0xFF191919;
 pub const CLEAR_DEPTH: f32 = f32::MAX;
 
 pub const TILE_SIZE: usize = 64;
-pub const CLEAR_SUB_BUFFER: [u32; TILE_SIZE] = [CLEAR_COLOR; TILE_SIZE];
 
 // Keeps two masks to allow clearing prev resolve buffer before writing
 pub struct BufferTiles {
