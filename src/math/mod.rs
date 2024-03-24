@@ -7,6 +7,17 @@ pub use crate::math::point::*;
 pub use crate::math::transform::*;
 pub use crate::math::vector::*;
 
+/// This module contains a very basic implementation of math library mainly for learning purposes.
+/// A lot of the types are generic over the coordinate space they are defined in, e.g. a point in
+/// WorldSpace. This is mostly an experiment to learn about coordinate systems and rust generics,
+/// and I can't say that it has prevented a lot of bugs but there have been a few occasions when
+/// it has made the progress through the graphics pipeline more clear to me at least.
+///
+/// The general idea is that primitives such as points, vectors and triangles (defined in graphics_primitives::) are defined
+/// in a coordinate space and to transform them to another, you need to transform them with a matrix that defines a transformation
+/// between coordinate systems as part of its type signature, e.g. Mat4<WorldSpace, CameraSpace> would transform a Vec4<WorldSpace>
+/// to Vec4<CameraSpace>.
+
 pub trait PrintableType {
     const NAME: &'static str;
 }
@@ -29,13 +40,13 @@ pub struct WorldSpace;
 #[derive(Copy, Clone)]
 pub struct CameraSpace;
 
-/// This space ranges from -1, 1 for all axes and everything that is outside may be clipped
-/// Also known as projection space
+/// This space ranges from -w, w for all axes and everything that is outside may be clipped.
+/// Also known as projection space.
 #[derive(Copy, Clone)]
 pub struct ClipSpace;
 
 /// Normalized Device Coordinates, x and y have been divided by the the clip space w coordinate.
-/// All axes range from -1, 1
+/// All axes range from -1, 1.
 #[derive(Copy, Clone)]
 pub struct NDC;
 

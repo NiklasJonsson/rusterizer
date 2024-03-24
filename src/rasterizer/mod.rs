@@ -101,7 +101,7 @@ impl<'a> Fragment<'a> {
 
 fn clamp_bary(x: f32) -> f32 {
     const EPS: f32 = 0.0001;
-    debug_assert!(x >= 0.0 - EPS && x <= 1.0 + EPS, "{}", x);
+    debug_assert!((0.0 - EPS..=1.0 + EPS).contains(&x), "{}", x);
     x.clamp(0.0, 1.0)
 }
 
@@ -165,7 +165,7 @@ impl EdgeFunctions {
                 if normal.y() < 0.0 {
                     return true;
                 }
-                return false;
+                false
             })
     }
 
@@ -316,9 +316,9 @@ impl Rasterizer {
         let zmin = 0.0;
         let zmax = 1.0;
         let new_vert = |vert: Point4D<NDC>| {
-            debug_assert!(vert.x() <= 1.0 && vert.x() >= -1.0);
-            debug_assert!(vert.y() <= 1.0 && vert.y() >= -1.0);
-            debug_assert!(vert.z() <= 1.0 && vert.z() >= -1.0);
+            debug_assert!(vert.x() <= 1.0 && vert.x() >= -1.0, "{}", vert.x());
+            debug_assert!(vert.y() <= 1.0 && vert.y() >= -1.0, "{}", vert.y());
+            debug_assert!(vert.z() <= 1.0 && vert.z() >= -1.0, "{}", vert.z());
 
             let x = self.width as f32 * (vert.x() + 1.0) / 2.0;
             // Flip y as color buffer start upper left
@@ -342,6 +342,22 @@ impl Rasterizer {
         ];
 
         RasterizerTriangle::new(vertices, depths, tri.vertex_attributes)
+    }
+
+    fn bounding_box(&self, triangle: &RasterizerTriangle) -> PixelBoundingBox {
+        let tri_b_box = PixelBoundingBox::from(&triangle.edge_functions.points);
+        // In the future, I think this would be the place to implement scissor support.
+        // Instead of hardcoding these, the user would supply a scissoring rect that could be used to bound the triangles.
+        let viewport_min_x = 0;
+        let viewport_max_x = self.width;
+        let viewport_min_y = 0;
+        let viewport_max_y = self.height;
+        PixelBoundingBox {
+            min_x: std::cmp::max(tri_b_box.min_x, viewport_min_x),
+            max_x: std::cmp::min(tri_b_box.max_x, viewport_max_x),
+            min_y: std::cmp::max(tri_b_box.min_y, viewport_min_y),
+            max_y: std::cmp::min(tri_b_box.max_y, viewport_max_y),
+        }
     }
 
     fn depth_coverage(
@@ -386,46 +402,73 @@ impl Rasterizer {
         uniforms: &Uniforms,
         fragment_shader: crate::render::FragmentShader,
     ) {
-        for triangle in triangles {
+        // # Triangle clipping
+        // As I've understood things, there are two opportunities for clipping/culling:
+        // 1. Before perspective divide. Clipping triangles based on the viewing frustum.
+        // 2. After conversion to screenspace, clipping the triangle bounding box.
+        //
+        // 1. Gives these benefits:
+        //   - More triangles discarded early.
+        //   - Bounds the input values for coordinates for later stages by constraining all triangles/coordinates to the viewing volume.
+        //   - Simpler to interpolate vertex attributes for newly created triangles.
+        // 2. Is fairly straightforward, we just make sure to not walk the pixels (fragments) in the triangle bounding box that we know already are outside.
+        //   It only works for x/y directions though, the depth needs to be clipped in 1. New triangles are not created, no need for interpolation.
+        //
+        // It might be possible to remove 2, assuming 1 always produces triangles that are perfectly inside the viewport but to make the code
+        // a bit more error-tolerant, I have kept 2 as well. It would also be needed in case guard-bands are introduced for clipping at some point in the
+        // future. Triangles would no longer be clipped to the viewport in 1 but to a larger area, which means they'd need to be clipped to the viewport.
+        // Some sources:
+        // * https://www.reddit.com/r/GraphicsProgramming/comments/zxlti5/near_clipping_before_perspective_projection/
+        // * https://www.reddit.com/r/GraphicsProgramming/comments/mi45z7/raster_clipping_vs_geometry_clipping/
+        // * https://fabiensanglard.net/polygon_codec/clippingdocument/p245-blinn.pdf
+
+        for raw_triangle in triangles {
+            let mut clipped_triangles: &[Triangle<ClipSpace>] = &[raw_triangle.clone()];
+            let clipped_triangles_buf;
             use clipping::ClipResult;
-            match clipping::try_clip(&triangle) {
+            match clipping::try_clip(raw_triangle) {
                 ClipResult::Outside => continue,
                 ClipResult::Inside => (),
                 ClipResult::Clipped(tris) => {
-                    self.rasterize(&tris, uniforms, fragment_shader);
-                    continue;
+                    clipped_triangles_buf = tris;
+                    clipped_triangles = &clipped_triangles_buf;
                 }
             }
 
-            let triangle = Rasterizer::perspective_divide(triangle);
+            for triangle in clipped_triangles {
+                let triangle: Triangle<NDC> = Rasterizer::perspective_divide(triangle);
+                let mut triangle: RasterizerTriangle = self.viewport_transform(triangle);
+                let b_box = self.bounding_box(&triangle);
 
-            let mut triangle = self.viewport_transform(triangle);
-            let b_box = PixelBoundingBox::from(&triangle.edge_functions.points);
-            for i in b_box.min_y..b_box.max_y {
-                for j in b_box.min_x..b_box.max_x {
-                    triangle.edge_functions.eval(j, i);
-                    if triangle.edge_functions.any_coverage() {
-                        let fragment = triangle.fragment();
-                        let cov_mask = self.depth_coverage(
-                            i,
-                            j,
-                            triangle.edge_functions.coverage_mask,
-                            &fragment.sampled_depths,
-                        );
-                        if cov_mask.empty() {
-                            continue;
+                for i in b_box.min_y..b_box.max_y {
+                    for j in b_box.min_x..b_box.max_x {
+                        triangle.edge_functions.eval(j, i);
+                        if triangle.edge_functions.any_coverage() {
+                            let fragment = triangle.fragment();
+                            let cov_mask = self.depth_coverage(
+                                i,
+                                j,
+                                triangle.edge_functions.coverage_mask,
+                                &fragment.sampled_depths,
+                            );
+                            if cov_mask.empty() {
+                                continue;
+                            }
+
+                            let fc = FragCoords {
+                                x: j as f32 + 0.5,
+                                y: i as f32 + 0.5,
+                                depths: fragment.sampled_depths,
+                                mask: fragment.edge_functions.coverage_mask,
+                            };
+
+                            let col = fragment_shader(
+                                uniforms,
+                                &fc,
+                                &fragment.interpolate(j, i, cov_mask),
+                            );
+                            self.write_pixel(i, j, col, &fragment.sampled_depths, cov_mask);
                         }
-
-                        let fc = FragCoords {
-                            x: j as f32 + 0.5,
-                            y: i as f32 + 0.5,
-                            depths: fragment.sampled_depths,
-                            mask: fragment.edge_functions.coverage_mask,
-                        };
-
-                        let col =
-                            fragment_shader(uniforms, &fc, &fragment.interpolate(j, i, cov_mask));
-                        self.write_pixel(i, j, col, &fragment.sampled_depths, cov_mask);
                     }
                 }
             }
@@ -743,18 +786,18 @@ mod test {
         let e = rast_tri.edge_functions.eval_single(150.0, 225.0);
         assert!(EdgeFunctions::inside(&rast_tri.edge_functions.normals, &e));
         assert_eq!(e[0], 0.0);
-        assert_eq!(rast_tri.edge_functions.normals[0].x() > 0.0, true);
+        assert!(rast_tri.edge_functions.normals[0].x() > 0.0);
 
         let e = rast_tri.edge_functions.eval_single(250.0, 225.0);
         assert!(!EdgeFunctions::inside(&rast_tri.edge_functions.normals, &e));
         assert_eq!(e[1], 0.0);
-        assert_eq!(rast_tri.edge_functions.normals[1].x() < 0.0, true);
+        assert!(rast_tri.edge_functions.normals[1].x() < 0.0);
 
         let e = rast_tri.edge_functions.eval_single(250.0, 300.0);
         assert!(EdgeFunctions::inside(&rast_tri.edge_functions.normals, &e));
         assert_eq!(e[2], 0.0);
-        assert_eq!(rast_tri.edge_functions.normals[2].x() == 0.0, true);
-        assert_eq!(rast_tri.edge_functions.normals[2].y() < 0.0, true);
+        assert_eq!(rast_tri.edge_functions.normals[2].x(), 0.0);
+        assert!(rast_tri.edge_functions.normals[2].y() < 0.0);
     }
 
     #[test]

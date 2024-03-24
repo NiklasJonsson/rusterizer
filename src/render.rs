@@ -130,7 +130,12 @@ impl Renderer {
         if self.frame_time_idx == 10 {
             let t = d.as_secs_f32();
             self.window.set_title(
-                format!("Rusterizer FPS: {:.2}, ({:.2})", 1.0f32 / t, t * 1000.0f32).as_str(),
+                format!(
+                    "Rusterizer FPS: {:.2}, ({:.2} ms)",
+                    1.0f32 / t,
+                    t * 1000.0f32
+                )
+                .as_str(),
             );
             self.frame_time_idx = 0;
         } else {

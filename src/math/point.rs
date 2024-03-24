@@ -105,6 +105,17 @@ where
     }
 }
 
+impl<CS, const N: usize> Mul<Point<CS, N>> for f32
+where
+    CS: CoordinateSystem,
+{
+    type Output = Point<CS, { N }>;
+
+    fn mul(self, other: Point<CS, N>) -> Self::Output {
+        Point(other.0 * self)
+    }
+}
+
 impl<CS, const N: usize> Add<Vector<CS, { N }>> for Point<CS, { N }>
 where
     CS: CoordinateSystem,
@@ -113,6 +124,17 @@ where
 
     fn add(self, other: Vector<CS, { N }>) -> Self::Output {
         Self(self.0 + other)
+    }
+}
+
+impl<CS, const N: usize> Add<Point<CS, N>> for Point<CS, N>
+where
+    CS: CoordinateSystem,
+{
+    type Output = Point<CS, N>;
+
+    fn add(self, other: Point<CS, N>) -> Self::Output {
+        Self(self.0 + other.0)
     }
 }
 

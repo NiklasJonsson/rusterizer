@@ -1,7 +1,3 @@
-#![feature(const_generics)]
-#![feature(unsized_locals)]
-#![feature(clamp)]
-
 use std::time::Instant;
 
 mod camera;
@@ -13,6 +9,8 @@ mod rasterizer;
 mod render;
 mod texture;
 mod uniform;
+
+use math::WorldSpace;
 
 use crate::color::Color;
 use crate::graphics_primitives::VertexAttribute;
@@ -28,31 +26,46 @@ enum FS {
     Debug,
 }
 
-struct Args {
-    fs: FS,
+enum Mode {
+    Demo,
+    ClipTest,
 }
 
+struct Args {
+    fs: FS,
+    mode: Mode,
+}
+
+// Lazy, dependency-free CLI parsing
 fn parse_args() -> Args {
-    let ret = Args { fs: FS::Texture };
+    let mut ret = Args {
+        fs: FS::Texture,
+        mode: Mode::Demo,
+    };
 
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
         return ret;
     }
 
-    if args[1] == "--color-fs" {
-        return Args { fs: FS::Color };
-    }
-
-    if args[1] == "--debug-fs" {
-        return Args { fs: FS::Debug };
+    // Only supports flags
+    for arg in args.iter().skip(1) {
+        if arg == "--color-fs" {
+            ret.fs = FS::Color;
+        } else if arg == "--debug-fs" {
+            ret.fs = FS::Debug;
+        } else if arg == "--clip-test" {
+            ret.mode = Mode::ClipTest;
+        } else {
+            panic!("Invalid argument: {arg}");
+        }
     }
 
     ret
 }
 
-fn choose_shader(args: &Args) -> FragmentShader {
-    match args.fs {
+fn choose_shader(fs: FS) -> FragmentShader {
+    match fs {
         FS::Texture => |uniforms: &Uniforms, _: &rasterizer::FragCoords, attr: &VertexAttribute| {
             uniforms.get_texture(0).sample(attr.uvs[0], attr.uvs[1])
         },
@@ -60,6 +73,56 @@ fn choose_shader(args: &Args) -> FragmentShader {
         FS::Debug => |_: &Uniforms, frag_coords: &rasterizer::FragCoords, _: &VertexAttribute| {
             Color::grayscale(frag_coords.depths[0])
         },
+    }
+}
+
+struct Scene {
+    // matrices and meshes should always be the same length
+    matrices: Vec<math::Mat4<math::WorldSpace>>,
+    meshes: Vec<mesh::Mesh<WorldSpace>>,
+}
+
+struct Time {
+    elapsed: std::time::Duration,
+}
+
+type Update = Box<dyn Fn(&mut Scene, &Time)>;
+
+fn setup_scene(mode: Mode) -> (Scene, Update) {
+    match mode {
+        Mode::Demo => {
+            let update = |scene: &mut Scene, time: &Time| {
+                let elapsed = time.elapsed.as_secs_f32();
+                scene.matrices[0] = math::rotate::<math::WorldSpace>(elapsed, elapsed, 0.0);
+                scene.matrices[1] =
+                    math::rotate::<math::WorldSpace>(elapsed, 0.0, std::f32::consts::FRAC_PI_4)
+                        * math::translate::<math::WorldSpace>(0.0, 3.0, 0.0);
+            };
+
+            let meshes = vec![mesh::cube(1.0), mesh::sphere(0.5)];
+            let matrices = vec![math::Mat4::<math::WorldSpace>::identity(); meshes.len()];
+            (Scene { matrices, meshes }, Box::new(update))
+        }
+        Mode::ClipTest => {
+            // Here is some hackery to stress test the clipping
+            let meshes = vec![mesh::triangle::<math::WorldSpace>()];
+            let matrices = vec![math::Mat4::<math::WorldSpace>::identity(); meshes.len()];
+            let update = |scene: &mut Scene, time: &Time| {
+                let elapsed = time.elapsed.as_secs_f32();
+                // Triangle that "follows the window border" (rotate around z at approx window width)
+                // This is hardcoded based on the current width/height of the window :(
+                // It should instead be the screen space position, transformed with the inverse of the MVP and screen space scaling.
+                let magic_constant_screen_width_in_world_space = 7.3;
+                scene.matrices[0] = math::rotate_z(elapsed)
+                    * math::translate::<math::WorldSpace>(
+                        magic_constant_screen_width_in_world_space,
+                        0.0,
+                        0.0,
+                    )
+                    * math::rotate_z(-elapsed);
+            };
+            (Scene { matrices, meshes }, Box::new(update))
+        }
     }
 }
 
@@ -81,9 +144,6 @@ fn main() {
     let tex = texture::Texture::from_png_file("images/checkerboard.png");
     renderer.uniforms().bind_texture(0, tex);
 
-    let meshes = [mesh::cube(1.0), mesh::sphere(0.5)];
-    let mut matrices = [math::Mat4::<math::WorldSpace>::identity(); 2];
-
     let vertex_shader = |uniforms: &Uniforms, vertex: &math::Point3D<math::WorldSpace>| {
         uniforms.read_block().projection
             * uniforms.read_block().view
@@ -91,7 +151,8 @@ fn main() {
             * vertex.extend(1.0)
     };
 
-    let fragment_shader = choose_shader(&args);
+    let fragment_shader = choose_shader(args.fs);
+    let (mut scene, update) = setup_scene(args.mode);
 
     let start = Instant::now();
     let mut now = Instant::now();
@@ -99,14 +160,16 @@ fn main() {
         renderer.display_frame_time(&now.elapsed());
         now = Instant::now();
 
-        let diff = start.elapsed().as_secs_f32();
-        matrices[0] = math::rotate::<math::WorldSpace>(diff, diff, 0.0);
-        matrices[1] = math::rotate::<math::WorldSpace>(diff, 0.0, std::f32::consts::FRAC_PI_4)
-            * math::translate::<math::WorldSpace>(0.0, 3.0, 0.0);
+        update(
+            &mut scene,
+            &Time {
+                elapsed: start.elapsed(),
+            },
+        );
 
-        for (mesh, mat) in meshes.iter().zip(matrices.iter()) {
+        for (mesh, mat) in scene.meshes.iter().zip(scene.matrices.iter()) {
             renderer.uniforms().write_block().world = *mat;
-            renderer.render(&mesh, vertex_shader, fragment_shader);
+            renderer.render(mesh, vertex_shader, fragment_shader);
         }
 
         match renderer.display() {

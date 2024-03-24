@@ -70,12 +70,12 @@ where
     }
 }
 
-impl<CS, const N: usize> Into<[f32; N]> for Vector<CS, { N }>
+impl<CS, const N: usize> From<Vector<CS, { N }>> for [f32; N]
 where
     CS: CoordinateSystem,
 {
-    fn into(self) -> [f32; N] {
-        self.arr
+    fn from(val: Vector<CS, { N }>) -> Self {
+        val.arr
     }
 }
 
@@ -209,7 +209,7 @@ impl<CS: CoordinateSystem> Vec3<CS> {
 }
 
 pub type Vec4<CS> = Vector<CS, 4>;
-pub fn vec4<CS: CoordinateSystem>(x: f32, y: f32, z: f32, w: f32) -> Vec4<CS> {
+pub const fn vec4<CS: CoordinateSystem>(x: f32, y: f32, z: f32, w: f32) -> Vec4<CS> {
     Vec4::<CS> {
         arr: [x, y, z, w],
         coordinate_system: PhantomData {},
@@ -347,7 +347,7 @@ mod tests {
         );
         assert_eq!(
             vec3::<WorldSpace>(13.0, 10.90, -15.0) / -3.0,
-            vec3::<WorldSpace>(-4.333333333333, -3.6333332, 5.0)
+            vec3::<WorldSpace>(-4.333_333_5, -3.6333332, 5.0)
         );
     }
 
@@ -356,18 +356,18 @@ mod tests {
         let v = [
             vec3::<WorldSpace>(3.0, 10.34, 1.0),
             vec3::<WorldSpace>(13.0, 10.90, -15.0),
-            vec3::<WorldSpace>(-10345.1240, 0.9123, -15.0),
+            vec3::<WorldSpace>(-10_345.124, 0.9123, -15.0),
         ];
 
         let expected = [
             vec3::<WorldSpace>(6.0, 20.68, 2.0),
             vec3::<WorldSpace>(16.0, 21.24, -14.0),
-            vec3::<WorldSpace>(-10342.1240, 11.2523, -14.0),
+            vec3::<WorldSpace>(-10_342.124, 11.2523, -14.0),
             vec3::<WorldSpace>(16.0, 21.24, -14.0),
             vec3::<WorldSpace>(26.0, 21.80, -30.0),
-            vec3::<WorldSpace>(-10332.1240, 11.8123, -30.0),
-            vec3::<WorldSpace>(-10342.1240, 11.2523, -14.0),
-            vec3::<WorldSpace>(-10332.1240, 11.8123, -30.0),
+            vec3::<WorldSpace>(-10_332.124, 11.8123, -30.0),
+            vec3::<WorldSpace>(-10_342.124, 11.2523, -14.0),
+            vec3::<WorldSpace>(-10_332.124, 11.8123, -30.0),
             vec3::<WorldSpace>(-20690.248, 1.8246, -30.0),
         ];
         for i in 0..3 {
@@ -382,19 +382,19 @@ mod tests {
         let v = [
             vec4::<WorldSpace>(3.0, 10.34, 1.0, 0.0),
             vec4::<WorldSpace>(13.0, 10.90, -15.0, 0.0),
-            vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 0.0),
+            vec4::<WorldSpace>(-10_345.124, 0.9123, -15.0, 0.0),
             vec4::<WorldSpace>(3.0, 10.34, 1.0, 1.0),
             vec4::<WorldSpace>(13.0, 10.90, -15.0, 1.0),
-            vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 1.0),
+            vec4::<WorldSpace>(-10_345.124, 0.9123, -15.0, 1.0),
         ];
 
         let expected = [
             vec4::<WorldSpace>(3.0, 10.34, 1.0, 0.0),
             vec4::<WorldSpace>(13.0, 10.90, -15.0, 0.0),
-            vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 0.0),
+            vec4::<WorldSpace>(-10_345.124, 0.9123, -15.0, 0.0),
             vec4::<WorldSpace>(3.0, 10.34, 1.0, 1.0),
             vec4::<WorldSpace>(13.0, 10.90, -15.0, 1.0),
-            vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 1.0),
+            vec4::<WorldSpace>(-10_345.124, 0.9123, -15.0, 1.0),
         ];
 
         for j in 0..v.len() {
@@ -407,19 +407,19 @@ mod tests {
         let v = [
             vec4::<WorldSpace>(3.0, 10.34, 1.0, 0.0),
             vec4::<WorldSpace>(13.0, 10.90, -15.0, 0.0),
-            vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 0.0),
+            vec4::<WorldSpace>(-10_345.124, 0.9123, -15.0, 0.0),
             vec4::<WorldSpace>(3.0, 10.34, 1.0, 1.0),
             vec4::<WorldSpace>(13.0, 10.90, -15.0, 1.0),
-            vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 1.0),
+            vec4::<WorldSpace>(-10_345.124, 0.9123, -15.0, 1.0),
         ];
 
         let expected = [
             vec4::<WorldSpace>(3.0, 10.34, 1.0, 0.0),
             vec4::<WorldSpace>(13.0, 10.90, -15.0, 0.0),
-            vec4::<WorldSpace>(-10345.1240, 0.9123, -15.0, 0.0),
+            vec4::<WorldSpace>(-10_345.124, 0.9123, -15.0, 0.0),
             vec4::<WorldSpace>(7.0, 8.34, 5.5, 1.0),
             vec4::<WorldSpace>(17.0, 8.90, -10.5, 1.0),
-            vec4::<WorldSpace>(-10341.1240, -1.0877, -10.5, 1.0),
+            vec4::<WorldSpace>(-10_341.124, -1.0877, -10.5, 1.0),
         ];
 
         let mat4s = [transform::translate::<WorldSpace>(4.0, -2.0, 4.5)];

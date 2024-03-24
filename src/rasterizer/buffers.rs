@@ -6,7 +6,6 @@ pub const CLEAR_COLOR: u32 = 0xFF191919;
 pub const CLEAR_DEPTH: f32 = f32::MAX;
 
 pub const TILE_SIZE: usize = 64;
-pub const CLEAR_SUB_BUFFER: [u32; TILE_SIZE] = [CLEAR_COLOR; TILE_SIZE];
 
 // Keeps two masks to allow clearing prev resolve buffer before writing
 pub struct BufferTiles {
@@ -152,7 +151,7 @@ impl DepthBuffer {
     }
 
     pub fn set_depth(&mut self, idx: usize, mask_idx: u8, depth: f32) {
-        debug_assert!(depth >= 0.0 && depth <= 1.0, "Invalid depth: {}", depth);
+        debug_assert!((0.0..=1.0).contains(&depth), "Invalid depth: {}", depth);
         self.buffer[idx][mask_idx as usize] = depth;
     }
 }
