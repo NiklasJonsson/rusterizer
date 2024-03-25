@@ -398,20 +398,30 @@ impl Rasterizer {
         // Both 2 and 3 might fix this issue but 3. might hide an issue in 2 though 3 should be done anyhow.
 
         for triangle in triangles {
-            use clipping::ClipResult;
-            match clipping::try_clip(triangle) {
-                ClipResult::Outside => continue,
-                ClipResult::Inside => (),
-                ClipResult::Clipped(tris) => {
-                    self.rasterize(&tris, uniforms, fragment_shader);
-                    continue;
-                }
-            }
+            /*     use clipping::ClipResult;
+                       match clipping::try_clip(triangle) {
+                           ClipResult::Outside => continue,
+                           ClipResult::Inside => (),
+                           ClipResult::Clipped(tris) => {
+                               self.rasterize(&tris, uniforms, fragment_shader);
+                               continue;
+                           }
+                       }
 
-            let triangle = Rasterizer::perspective_divide(triangle);
+            */
+            let triangle: Triangle<NDC> = Rasterizer::perspective_divide(triangle);
 
             let mut triangle = self.viewport_transform(triangle);
             let b_box = PixelBoundingBox::from(&triangle.edge_functions.points);
+
+            // Some online resoures (the trip through the graphics pipeline) suggested just clipping the bounding box to the scissor/viewport rects which should be fine?
+            // Note sure why we need the complex clipping except for the gfx api specs?
+            // TODO: Ask on reddit.
+            // Some links:
+            // * https://www.reddit.com/r/GraphicsProgramming/comments/mi45z7/raster_clipping_vs_geometry_clipping/
+            // * https://www.reddit.com/r/GraphicsProgramming/comments/zxlti5/near_clipping_before_perspective_projection/
+            // * https://fabiensanglard.net/polygon_codec/clippingdocument/p245-blinn.pdf
+
             for i in b_box.min_y..b_box.max_y {
                 for j in b_box.min_x..b_box.max_x {
                     triangle.edge_functions.eval(j, i);

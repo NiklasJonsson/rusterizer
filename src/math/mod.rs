@@ -29,13 +29,13 @@ pub struct WorldSpace;
 #[derive(Copy, Clone)]
 pub struct CameraSpace;
 
-/// This space ranges from -1, 1 for all axes and everything that is outside may be clipped
-/// Also known as projection space
+/// This space ranges from -w, w for all axes and everything that is outside may be clipped.
+/// Also known as projection space.
 #[derive(Copy, Clone)]
 pub struct ClipSpace;
 
 /// Normalized Device Coordinates, x and y have been divided by the the clip space w coordinate.
-/// All axes range from -1, 1
+/// All axes range from -1, 1.
 #[derive(Copy, Clone)]
 pub struct NDC;
 
