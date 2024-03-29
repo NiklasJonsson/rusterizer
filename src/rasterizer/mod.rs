@@ -344,6 +344,22 @@ impl Rasterizer {
         RasterizerTriangle::new(vertices, depths, tri.vertex_attributes)
     }
 
+    fn bounding_box(&self, triangle: &RasterizerTriangle) -> PixelBoundingBox {
+        let tri_b_box = PixelBoundingBox::from(&triangle.edge_functions.points);
+        // In the future, I think this would be the place to implement scissor support.
+        // Instead of hardcoding these, the user would supply a scissoring rect that could be used to bound the triangles.
+        let viewport_min_x = 0;
+        let viewport_max_x = self.width;
+        let viewport_min_y = 0;
+        let viewport_max_y = self.height;
+        PixelBoundingBox {
+            min_x: std::cmp::max(tri_b_box.min_x, viewport_min_x),
+            max_x: std::cmp::min(tri_b_box.max_x, viewport_max_x),
+            min_y: std::cmp::max(tri_b_box.min_y, viewport_min_y),
+            max_y: std::cmp::min(tri_b_box.max_y, viewport_max_y),
+        }
+    }
+
     fn depth_coverage(
         &self,
         row: usize,
@@ -386,67 +402,81 @@ impl Rasterizer {
         uniforms: &Uniforms,
         fragment_shader: crate::render::FragmentShader,
     ) {
-        // TODO: Start here
-        // The app crashes due to the self.rasterize ending up in infinite recursion.
-        // Though it was a while since I looked at this, it seems like:
-        // 1. I wasn't thinking when I made this recursive!?
-        // 2. The clipping algo ends up creating some triangles that are not deemed inside of the clipping volume
-        // To fix this:
-        // 1. Write the repro test case in `mod clipping`
-        // 2. Readup on the clipping algo and fix the test case.
-        // 3. Make this not recursive.
-        // Both 2 and 3 might fix this issue but 3. might hide an issue in 2 though 3 should be done anyhow.
+        // # Triangle clipping
+        // As I've understood things, there are two opportunities for clipping/culling:
+        // 1. Before perspective divide. Clipping triangles based on the viewing frustum.
+        // 2. After conversion to screenspace, clipping the triangle bounding box.
+        //
+        // 2 is fairly straightforwad, we just make sure to not walk the pixels (fragments) in the triangle bounding box that we know already are outside
+        // TODO make sense of the rest of these notes:
+        // - Why is 2 needed if 1 is correct & pixel-accurate?
+        // - Why should we clip partial triangles into smaller? Why not just keep the full triangle but reduce the bounding box with 2?
+        //   * Fixed point precision for edge functions?
+        //   * Near/far planes need to be clipped for w shenanigans (inf sizes, 0 divides etc.)?
+        // Some online resoures (the trip through the graphics pipeline) suggested just clipping the bounding box to the scissor/viewport rects which should be fine?
+        // Note sure why we need the complex clipping except for the gfx api specs?
+        // Some links:
+        // * https://www.reddit.com/r/GraphicsProgramming/comments/mi45z7/raster_clipping_vs_geometry_clipping/
+        // * https://www.reddit.com/r/GraphicsProgramming/comments/zxlti5/near_clipping_before_perspective_projection/
+        // * https://fabiensanglard.net/polygon_codec/clippingdocument/p245-blinn.pdf
+        // It seems like:
+        // We want to clip in clip-space to:
+        // 1. Correctness: Cull triangles that are out of bounds, especially the too-near ones as it might lead to bad divisions with perspective divide
+        // 2. Optimize: Less triangles to do perspective-divide for.
+        // 3. Viewport-clipping can still be done here, e.g. assume that there is guard-band clipping in the previous step. Then, we don't want to rasterize
+        //   outside of the viewport even though the triangle might be outside it.
 
-        for triangle in triangles {
-            /*     use clipping::ClipResult;
-                       match clipping::try_clip(triangle) {
-                           ClipResult::Outside => continue,
-                           ClipResult::Inside => (),
-                           ClipResult::Clipped(tris) => {
-                               self.rasterize(&tris, uniforms, fragment_shader);
-                               continue;
-                           }
-                       }
+        // START HERE:
+        // Finish up the comment above and make sense of the reasoning behind clipping.
+        // Fix the clipping unit-test.
 
-            */
-            let triangle: Triangle<NDC> = Rasterizer::perspective_divide(triangle);
+        for raw_triangle in triangles {
+            let mut clipped_triangles: &[Triangle<ClipSpace>] = &[raw_triangle.clone()];
+            let clipped_triangles_buf;
+            use clipping::ClipResult;
+            match clipping::try_clip(raw_triangle) {
+                ClipResult::Outside => continue,
+                ClipResult::Inside => (),
+                ClipResult::Clipped(tris) => {
+                    clipped_triangles_buf = tris;
+                    clipped_triangles = &clipped_triangles_buf;
+                }
+            }
 
-            let mut triangle = self.viewport_transform(triangle);
-            let b_box = PixelBoundingBox::from(&triangle.edge_functions.points);
+            for triangle in clipped_triangles {
+                let triangle: Triangle<NDC> = Rasterizer::perspective_divide(triangle);
+                let mut triangle: RasterizerTriangle = self.viewport_transform(triangle);
+                let b_box = self.bounding_box(&triangle);
 
-            // Some online resoures (the trip through the graphics pipeline) suggested just clipping the bounding box to the scissor/viewport rects which should be fine?
-            // Note sure why we need the complex clipping except for the gfx api specs?
-            // TODO: Ask on reddit.
-            // Some links:
-            // * https://www.reddit.com/r/GraphicsProgramming/comments/mi45z7/raster_clipping_vs_geometry_clipping/
-            // * https://www.reddit.com/r/GraphicsProgramming/comments/zxlti5/near_clipping_before_perspective_projection/
-            // * https://fabiensanglard.net/polygon_codec/clippingdocument/p245-blinn.pdf
+                for i in b_box.min_y..b_box.max_y {
+                    for j in b_box.min_x..b_box.max_x {
+                        triangle.edge_functions.eval(j, i);
+                        if triangle.edge_functions.any_coverage() {
+                            let fragment = triangle.fragment();
+                            let cov_mask = self.depth_coverage(
+                                i,
+                                j,
+                                triangle.edge_functions.coverage_mask,
+                                &fragment.sampled_depths,
+                            );
+                            if cov_mask.empty() {
+                                continue;
+                            }
 
-            for i in b_box.min_y..b_box.max_y {
-                for j in b_box.min_x..b_box.max_x {
-                    triangle.edge_functions.eval(j, i);
-                    if triangle.edge_functions.any_coverage() {
-                        let fragment = triangle.fragment();
-                        let cov_mask = self.depth_coverage(
-                            i,
-                            j,
-                            triangle.edge_functions.coverage_mask,
-                            &fragment.sampled_depths,
-                        );
-                        if cov_mask.empty() {
-                            continue;
+                            let fc = FragCoords {
+                                x: j as f32 + 0.5,
+                                y: i as f32 + 0.5,
+                                depths: fragment.sampled_depths,
+                                mask: fragment.edge_functions.coverage_mask,
+                            };
+
+                            let col = fragment_shader(
+                                uniforms,
+                                &fc,
+                                &fragment.interpolate(j, i, cov_mask),
+                            );
+                            self.write_pixel(i, j, col, &fragment.sampled_depths, cov_mask);
                         }
-
-                        let fc = FragCoords {
-                            x: j as f32 + 0.5,
-                            y: i as f32 + 0.5,
-                            depths: fragment.sampled_depths,
-                            mask: fragment.edge_functions.coverage_mask,
-                        };
-
-                        let col =
-                            fragment_shader(uniforms, &fc, &fragment.interpolate(j, i, cov_mask));
-                        self.write_pixel(i, j, col, &fragment.sampled_depths, cov_mask);
                     }
                 }
             }
