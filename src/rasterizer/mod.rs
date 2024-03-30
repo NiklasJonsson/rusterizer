@@ -316,9 +316,9 @@ impl Rasterizer {
         let zmin = 0.0;
         let zmax = 1.0;
         let new_vert = |vert: Point4D<NDC>| {
-            debug_assert!(vert.x() <= 1.0 && vert.x() >= -1.0);
-            debug_assert!(vert.y() <= 1.0 && vert.y() >= -1.0);
-            debug_assert!(vert.z() <= 1.0 && vert.z() >= -1.0);
+            debug_assert!(vert.x() <= 1.0 && vert.x() >= -1.0, "{}", vert.x());
+            debug_assert!(vert.y() <= 1.0 && vert.y() >= -1.0, "{}", vert.y());
+            debug_assert!(vert.z() <= 1.0 && vert.z() >= -1.0, "{}", vert.z());
 
             let x = self.width as f32 * (vert.x() + 1.0) / 2.0;
             // Flip y as color buffer start upper left
@@ -407,28 +407,19 @@ impl Rasterizer {
         // 1. Before perspective divide. Clipping triangles based on the viewing frustum.
         // 2. After conversion to screenspace, clipping the triangle bounding box.
         //
-        // 2 is fairly straightforwad, we just make sure to not walk the pixels (fragments) in the triangle bounding box that we know already are outside
-        // TODO make sense of the rest of these notes:
-        // - Why is 2 needed if 1 is correct & pixel-accurate?
-        // - Why should we clip partial triangles into smaller? Why not just keep the full triangle but reduce the bounding box with 2?
-        //   * Fixed point precision for edge functions?
-        //   * Near/far planes need to be clipped for w shenanigans (inf sizes, 0 divides etc.)?
-        // Some online resoures (the trip through the graphics pipeline) suggested just clipping the bounding box to the scissor/viewport rects which should be fine?
-        // Note sure why we need the complex clipping except for the gfx api specs?
-        // Some links:
-        // * https://www.reddit.com/r/GraphicsProgramming/comments/mi45z7/raster_clipping_vs_geometry_clipping/
+        // 1. Gives these benefits:
+        //   - More triangles discarded early.
+        //   - Bounds the input values for coordinates for later stages by constraining all triangles/coordinates to the viewing volume.
+        // 2. Is fairly straightforward, we just make sure to not walk the pixels (fragments) in the triangle bounding box that we know already are outside.
+        //   It only works for x/y directions though, the depth needs to be clipped in 1.
+        //
+        // It might be possible to remove 2, assuming 1 always produces triangles that are perfectly inside the viewport but to make the code
+        // a bit more error-tolerant, I have kept 2 as well. It would also be needed in case guard-bands are introduced for clipping at some point in the
+        // future. Triangles would no longer be clipped to the viewport in 1 but to a larger area, which means they'd need to be clipped to the viewport.
+        // Some sources:
         // * https://www.reddit.com/r/GraphicsProgramming/comments/zxlti5/near_clipping_before_perspective_projection/
+        // * https://www.reddit.com/r/GraphicsProgramming/comments/mi45z7/raster_clipping_vs_geometry_clipping/
         // * https://fabiensanglard.net/polygon_codec/clippingdocument/p245-blinn.pdf
-        // It seems like:
-        // We want to clip in clip-space to:
-        // 1. Correctness: Cull triangles that are out of bounds, especially the too-near ones as it might lead to bad divisions with perspective divide
-        // 2. Optimize: Less triangles to do perspective-divide for.
-        // 3. Viewport-clipping can still be done here, e.g. assume that there is guard-band clipping in the previous step. Then, we don't want to rasterize
-        //   outside of the viewport even though the triangle might be outside it.
-
-        // START HERE:
-        // Finish up the comment above and make sense of the reasoning behind clipping.
-        // Fix the clipping unit-test.
 
         for raw_triangle in triangles {
             let mut clipped_triangles: &[Triangle<ClipSpace>] = &[raw_triangle.clone()];

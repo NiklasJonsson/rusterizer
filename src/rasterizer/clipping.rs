@@ -79,33 +79,32 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
         return ClipResult::Outside;
     }
 
-    let mut inside = [[true; 2]; 3];
-    let mut outside = [[true; 2]; 3];
+    // Fast checks:
+    // If all x, and all y and all z coords are inside w, the triangle is inside the volume.
+    // If all x or all y or all z coords of the triangle are outside 'w', then the triangle is outside.
+    let mut inside = [true; 3];
+    let mut outside = [true; 3];
     for v in triangle.vertices.iter() {
-        inside[0][0] &= v.x() >= -v.w();
-        inside[1][0] &= v.y() >= -v.w();
-        inside[2][0] &= v.z() >= -v.w();
+        inside[0] &= v.x() >= -v.w() && v.x() <= v.w();
+        inside[1] &= v.y() >= -v.w() && v.y() <= v.w();
+        inside[2] &= v.z() >= -v.w() && v.z() <= v.w();
 
-        inside[0][1] &= v.x() <= v.w();
-        inside[1][1] &= v.y() <= v.w();
-        inside[2][1] &= v.z() <= v.w();
-
-        outside[0][0] &= v.x() < -v.w();
-        outside[1][0] &= v.y() < -v.w();
-        outside[2][0] &= v.z() < -v.w();
-
-        outside[0][1] &= v.x() > v.w();
-        outside[1][1] &= v.y() > v.w();
-        outside[2][1] &= v.z() > v.w();
+        outside[0] &= v.x() < -v.w() || v.x() > v.w();
+        outside[1] &= v.y() < -v.w() || v.y() > v.w();
+        outside[2] &= v.z() < -v.w() || v.z() > v.w();
     }
 
-    if outside.iter().any(|&x| x.iter().any(|&x| x)) {
+    if outside.into_iter().any(|x| x) {
         return ClipResult::Outside;
     }
 
-    if inside.iter().all(|&x| x.iter().all(|&x| x)) {
+    if inside.into_iter().all(|x| x) {
         return ClipResult::Inside;
     }
+
+    // We now have a triangle that is partially inside the viewing volume, which means it needs to be clipped.
+
+    // TODO: Is there a source for these? Should they not be w/-w?
 
     // With these definitions, the positive half space points to inside the bounding box.
     // => A point is inside for dot() > 0.0
@@ -471,6 +470,8 @@ mod test {
         }
     }
 
+    // START HERE:
+    // 1. There is a failing test in the unit tests in this file, this should be fixed.
     #[test]
     fn test_clipped_tris_are_inside() {
         // Test that clipping the result of the clipping are not clipped again...
