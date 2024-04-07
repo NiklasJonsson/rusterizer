@@ -80,7 +80,7 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
     }
 
     // Fast checks:
-    // If all x, and all y and all z coords are inside w, the triangle is inside the volume.
+    // If all x, all y and all z coords are inside w, the triangle is inside the volume.
     // If all x or all y or all z coords of the triangle are outside 'w', then the triangle is outside.
     let mut inside = [true; 3];
     let mut outside = [true; 3];
@@ -102,9 +102,15 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
         return ClipResult::Inside;
     }
 
-    // We now have a triangle that is partially inside the viewing volume, which means it needs to be clipped.
+    // START HERE:
+    // This seems to be based on a general plane/line intersection definitions
+    // and we don't use the w coordinate comparison optimization
+    // 1. Read up on plane/line intersection
+    // 2. Verify the below algo
+    // 3. Try to combine the "fast checks" with sotherland-hodgeman that actually uses w
+    //   Goals: Bounded allocation, caller allocates (preferable on stack but doesn't matter), add sources! Make interpolation look nice.
 
-    // TODO: Is there a source for these? Should they not be w/-w?
+    // We now have a triangle that is partially inside the viewing volume, which means it needs to be clipped.
 
     // With these definitions, the positive half space points to inside the bounding box.
     // => A point is inside for dot() > 0.0

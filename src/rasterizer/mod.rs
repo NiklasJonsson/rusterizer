@@ -410,8 +410,9 @@ impl Rasterizer {
         // 1. Gives these benefits:
         //   - More triangles discarded early.
         //   - Bounds the input values for coordinates for later stages by constraining all triangles/coordinates to the viewing volume.
+        //   - Simpler to interpolate vertex attributes for newly created triangles.
         // 2. Is fairly straightforward, we just make sure to not walk the pixels (fragments) in the triangle bounding box that we know already are outside.
-        //   It only works for x/y directions though, the depth needs to be clipped in 1.
+        //   It only works for x/y directions though, the depth needs to be clipped in 1. New triangles are not created, no need for interpolation.
         //
         // It might be possible to remove 2, assuming 1 always produces triangles that are perfectly inside the viewport but to make the code
         // a bit more error-tolerant, I have kept 2 as well. It would also be needed in case guard-bands are introduced for clipping at some point in the
