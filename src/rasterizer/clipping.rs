@@ -1,6 +1,5 @@
 use crate::graphics_primitives::{Triangle, VertexAttribute};
 use crate::math::point::*;
-use crate::math::vector::*;
 use crate::math::ClipSpace;
 
 #[derive(Debug, Clone)]
@@ -10,69 +9,7 @@ pub enum ClipResult {
     Clipped(Vec<Triangle<ClipSpace>>),
 }
 
-#[derive(PartialEq, Debug, Copy, Clone)]
-enum Intersection {
-    BothOutside,
-    BothInside,
-    FirstInside {
-        intersection: Point4D<ClipSpace>,
-        line_param: f32,
-    },
-    SecondInside {
-        intersection: Point4D<ClipSpace>,
-        line_param: f32,
-    },
-}
-
 const CULL_DEGENERATE_TRIANGLE_AREA_EPS: f32 = 0.000001;
-
-fn old_intersect(
-    plane_normal: &Vec4<ClipSpace>,
-    p0: &Point4D<ClipSpace>,
-    p1: &Point4D<ClipSpace>,
-) -> Intersection {
-    let p0_signed_dist = plane_normal.dot(p0.to_vec());
-    let p1_signed_dist = plane_normal.dot(p1.to_vec());
-    if p0_signed_dist >= 0.0 && p1_signed_dist >= 0.0 {
-        return Intersection::BothInside;
-    }
-
-    if p0_signed_dist < 0.0 && p1_signed_dist < 0.0 {
-        return Intersection::BothOutside;
-    }
-
-    // (1) Line: L(t) = p0 + (p1 - p0) * t
-    // (2) Plane: n * (p - p_a) == 0. For all our planes, p_a == 0 => n * p == 0
-    // Insert L(t) as p into (2) and solve for t (== line_param)
-    // t = -p0 * n / (p1 - p0) * n
-    let line_param_top = -plane_normal.dot(p0.to_vec());
-    let line_param_bottom = plane_normal.dot(*p1 - *p0);
-
-    // This means the line and the plane is parallel
-    if line_param_bottom == 0.0 {
-        // If this is true, the point fulfills the plane equation and is inside the plane
-        if line_param_top == 0.0 {
-            return Intersection::BothInside;
-        }
-        return Intersection::BothOutside;
-    }
-
-    let line_param = line_param_top / line_param_bottom;
-    let intersection = *p0 + (*p1 - *p0) * line_param;
-
-    if p0_signed_dist >= 0.0 {
-        return Intersection::FirstInside {
-            intersection,
-            line_param,
-        };
-    }
-
-    debug_assert!(p1_signed_dist >= 0.0);
-    Intersection::SecondInside {
-        intersection,
-        line_param,
-    }
-}
 
 #[derive(Clone, Copy)]
 enum ClipPlane {
@@ -89,7 +26,7 @@ enum ClipPlane {
 // and if it is zero, it is on the plane.
 // NOTE: As per the blinn paper, this is only proportional to the distance between the plane and the point
 // and should only be used for the signedness or as a term in the intersection calculation.
-fn distance_measure(plane: ClipPlane, p: &Point4D<ClipSpace>) -> f32 {
+fn distance_measure(plane: ClipPlane, p: Point4D<ClipSpace>) -> f32 {
     match plane {
         ClipPlane::LEFT => p.w() + p.x(),
         ClipPlane::RIGHT => p.w() - p.x(),
@@ -129,7 +66,7 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
 
     // Clip the triangle against the NDC cube but in clip-space, where the NDC cube (in clip-space) is:
     // -w <= x,y,z <= w
-    // (per-point, i.e. w is different for every point in the triangle)
+    // NOTE: W varies per vertex
     // The following code is using the Sutherland-Hodgman algorithm from this paper:
     // https://dl.acm.org/doi/pdf/10.1145/360767.360802
     // but there is some additional explanation in this paper by Blinn:
@@ -141,26 +78,36 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
     // which also talks about guard-band clipping.
 
     // Fast checks!
-    // There are only comparisons and boolean ops which means we can skip the divisions in the clipping.
+    // There are only comparisons and boolean ops which means we can skip more expensive calculations in the clipping.
     // If all x, all y and all z coords are inside w, the triangle is inside the volume, no clipping needed.
     // If all x or all y or all z coords of the triangle are outside 'w', then the triangle is outside and we cull it, no clipping needed.
-    let mut inside = [true; 3];
-    let mut outside = [true; 3];
+    // let mut inside = [true; 3];
+    // let mut outside = [true; 3];
+    let mut inside = [[true; 2]; 3];
+    let mut outside = [[true; 2]; 3];
     for v in triangle.vertices.iter() {
-        inside[0] &= v.x() >= -v.w() && v.x() <= v.w();
-        inside[1] &= v.y() >= -v.w() && v.y() <= v.w();
-        inside[2] &= v.z() >= -v.w() && v.z() <= v.w();
+        inside[0][0] &= v.x() >= -v.w();
+        inside[1][0] &= v.y() >= -v.w();
+        inside[2][0] &= v.z() >= -v.w();
 
-        outside[0] &= v.x() < -v.w() || v.x() > v.w();
-        outside[1] &= v.y() < -v.w() || v.y() > v.w();
-        outside[2] &= v.z() < -v.w() || v.z() > v.w();
+        inside[0][1] &= v.x() <= v.w();
+        inside[1][1] &= v.y() <= v.w();
+        inside[2][1] &= v.z() <= v.w();
+
+        outside[0][0] &= v.x() < -v.w();
+        outside[1][0] &= v.y() < -v.w();
+        outside[2][0] &= v.z() < -v.w();
+
+        outside[0][1] &= v.x() > v.w();
+        outside[1][1] &= v.y() > v.w();
+        outside[2][1] &= v.z() > v.w();
     }
 
-    if outside.into_iter().any(|x| x) {
+    if outside.iter().any(|&x| x.iter().any(|&x| x)) {
         return ClipResult::Outside;
     }
 
-    if inside.into_iter().all(|x| x) {
+    if inside.iter().all(|&x| x.iter().all(|&x| x)) {
         return ClipResult::Inside;
     }
 
@@ -181,13 +128,16 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
             let prev_i = (i + in_vertices.len() - 1) % in_vertices.len();
             let prev_vert = in_vertices[prev_i];
             let prev_attr = in_attrs[prev_i];
-            let prev_distance_measure = distance_measure(plane, &prev_vert);
-            let cur_distance_measure = distance_measure(plane, cur_vert);
+            let prev_distance_measure = distance_measure(plane, prev_vert);
+            let cur_distance_measure = distance_measure(plane, *cur_vert);
+            // The distance measure is zero if the point is on the plane and positive if it is inside the viewing volume.
             match (prev_distance_measure >= 0.0, cur_distance_measure >= 0.0) {
+                // Line is inside, no clipping
                 (true, true) => {
                     out_vertices.push(*cur_vert);
                     out_attrs.push(*cur_attr);
                 }
+                // Prev inside, cur outside => Add only intersection as prev was added last time (or will be added, if it is the last).
                 (true, false) => {
                     let (intersection, interpolation_factor) = compute_intersection(
                         prev_vert,
@@ -198,6 +148,7 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
                     out_vertices.push(intersection);
                     out_attrs.push((*cur_attr - prev_attr) * interpolation_factor + prev_attr);
                 }
+                // Prev outside, cur inside => Add intersection and current, adding a new edge
                 (false, true) => {
                     let (intersection, interpolation_factor) = compute_intersection(
                         prev_vert,
@@ -211,6 +162,7 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
                     out_vertices.push(*cur_vert);
                     out_attrs.push(*cur_attr);
                 }
+                // Line is outside, discard
                 (false, false) => {
                     continue;
                 }
@@ -220,11 +172,10 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
 
     // This can happen if even though initially, one or more points are inside, through clipping,
     // they end up outside.
-    /*     if out_vertices.is_empty() {
-           return ClipResult::Outside;
-       }
+    if out_vertices.is_empty() {
+        return ClipResult::Outside;
+    }
 
-    */
     debug_assert!(!out_vertices.is_empty());
     debug_assert_eq!(out_attrs.len(), out_vertices.len());
     debug_assert!(out_vertices.len() >= 3);
@@ -251,18 +202,6 @@ mod test {
         for (i, v) in verts.iter().enumerate() {
             println!("v{} = [{}, {}, {}, {}]", i, v.x(), v.y(), v.z(), v.w());
         }
-    }
-
-    #[test]
-    fn intersect_0() {
-        let clip_plane = vec4::<ClipSpace>(0.0, 1.0, 0.0, 1.0);
-        let p0 = Point4D::<ClipSpace>::new(3.93749976, -7.0, 5.06030178, 7.0);
-        let p1 = Point4D::<ClipSpace>::new(6.0, 7.0, 5.06030178, 7.0);
-
-        assert!(std::matches!(
-            old_intersect(&clip_plane, &p0, &p1),
-            Intersection::BothInside
-        ));
     }
 
     use crate::color::Color;
