@@ -85,7 +85,8 @@ enum ClipPlane {
 }
 
 // Terminology is from ther Sutherland-Hodgman paper. In Blinn, it is called boundary coordinate.
-// If this is positive, the point is inside the view volume for this plane, if it is negative, it is outside.
+// If this is positive, the point is inside the view volume for this plane, if it is negative, it is outside,
+// and if it is zero, it is on the plane.
 // NOTE: As per the blinn paper, this is only proportional to the distance between the plane and the point
 // and should only be used for the signedness or as a term in the intersection calculation.
 fn distance_measure(plane: ClipPlane, p: &Point4D<ClipSpace>) -> f32 {
@@ -176,13 +177,13 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
         out_attrs.clear();
         out_vertices.clear();
 
-        let mut prev_distance_measure: f32 = distance_measure(plane, in_vertices.last().unwrap());
         for (i, (cur_vert, cur_attr)) in in_vertices.iter().zip(in_attrs.iter()).enumerate() {
             let prev_i = (i + in_vertices.len() - 1) % in_vertices.len();
             let prev_vert = in_vertices[prev_i];
             let prev_attr = in_attrs[prev_i];
+            let prev_distance_measure = distance_measure(plane, &prev_vert);
             let cur_distance_measure = distance_measure(plane, cur_vert);
-            match (prev_distance_measure > 0.0, cur_distance_measure > 0.0) {
+            match (prev_distance_measure >= 0.0, cur_distance_measure >= 0.0) {
                 (true, true) => {
                     out_vertices.push(*cur_vert);
                     out_attrs.push(*cur_attr);
@@ -214,7 +215,6 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
                     continue;
                 }
             }
-            prev_distance_measure = cur_distance_measure;
         }
     }
 
@@ -243,122 +243,15 @@ pub fn try_clip(triangle: &Triangle<ClipSpace>) -> ClipResult {
     ClipResult::Clipped(out)
 }
 
-pub fn try_clip_old(triangle: &Triangle<ClipSpace>) -> ClipResult {
-    if super::triangle_2x_area(&triangle.vertices).abs() < CULL_DEGENERATE_TRIANGLE_AREA_EPS {
-        return ClipResult::Outside;
-    }
-
-    // Fast checks:
-    // If all x, all y and all z coords are inside w, the triangle is inside the volume.
-    // If all x or all y or all z coords of the triangle are outside 'w', then the triangle is outside.
-    let mut inside = [true; 3];
-    let mut outside = [true; 3];
-    for v in triangle.vertices.iter() {
-        inside[0] &= v.x() >= -v.w() && v.x() <= v.w();
-        inside[1] &= v.y() >= -v.w() && v.y() <= v.w();
-        inside[2] &= v.z() >= -v.w() && v.z() <= v.w();
-
-        outside[0] &= v.x() < -v.w() || v.x() > v.w();
-        outside[1] &= v.y() < -v.w() || v.y() > v.w();
-        outside[2] &= v.z() < -v.w() || v.z() > v.w();
-    }
-
-    if outside.into_iter().any(|x| x) {
-        return ClipResult::Outside;
-    }
-
-    if inside.into_iter().all(|x| x) {
-        return ClipResult::Inside;
-    }
-
-    // START HERE:
-    // This seems to be based on a general plane/line intersection definitions
-    // and we don't use the w coordinate comparison optimization
-    // 1. Read up on plane/line intersection
-    // 2. Verify the below algo
-    // 3. Try to combine the "fast checks" with sotherland-hodgeman that actually uses w
-    //   Goals: Bounded allocation, caller allocates (preferable on stack but doesn't matter), add sources! Make interpolation look nice.
-
-    // We now have a triangle that is partially inside the viewing volume, which means it needs to be clipped.
-
-    // With these definitions, the positive half space points to inside the bounding box.
-    // => A point is inside for dot() > 0.0
-    const CLIP_PLANES: [Vec4<ClipSpace>; 6] = [
-        vec4(1.0, 0.0, 0.0, 1.0),
-        vec4(-1.0, 0.0, 0.0, 1.0),
-        vec4(0.0, 1.0, 0.0, 1.0),
-        vec4(0.0, -1.0, 0.0, 1.0),
-        vec4(0.0, 0.0, 1.0, 1.0),
-        vec4(0.0, 0.0, -1.0, 1.0),
-    ];
-
-    let mut out_vertices: Vec<Point4D<ClipSpace>> = triangle.vertices.to_vec();
-    let mut out_attrs: Vec<VertexAttribute> = triangle.vertex_attributes.to_vec();
-
-    // Sotherland-Hodgeman
-    for clip_plane in CLIP_PLANES.iter() {
-        let in_vertices = out_vertices.clone();
-        let in_attrs = out_attrs.clone();
-        out_attrs.clear();
-        out_vertices.clear();
-        for (i, (vert, attr)) in in_vertices.iter().zip(in_attrs.iter()).enumerate() {
-            let prev_i = (i + in_vertices.len() - 1) % in_vertices.len();
-            let prev_vert = in_vertices[prev_i];
-            let prev_attr = in_attrs[prev_i];
-            match old_intersect(clip_plane, &prev_vert, vert) {
-                Intersection::BothOutside => continue,
-                Intersection::BothInside => {
-                    out_vertices.push(*vert);
-                    out_attrs.push(*attr);
-                }
-                Intersection::FirstInside {
-                    intersection,
-                    line_param,
-                } => {
-                    out_vertices.push(intersection);
-                    // Interpolate
-                    out_attrs.push((*attr - prev_attr) * line_param + prev_attr);
-                }
-                Intersection::SecondInside {
-                    intersection,
-                    line_param,
-                } => {
-                    out_vertices.push(intersection);
-                    // Interpolate
-                    out_attrs.push((*attr - prev_attr) * line_param + prev_attr);
-                    out_vertices.push(*vert);
-                    out_attrs.push(*attr);
-                }
-            };
-        }
-    }
-
-    // This can happen if even though initially, one or more points are inside, through clipping,
-    // they end up outside.
-    if out_vertices.is_empty() {
-        return ClipResult::Outside;
-    }
-
-    debug_assert_eq!(out_attrs.len(), out_vertices.len());
-    debug_assert!(out_vertices.len() >= 3);
-
-    let mut out = Vec::with_capacity(out_vertices.len() - 2);
-
-    for i in 0..out_vertices.len() - 2 {
-        out.push(Triangle {
-            vertices: [out_vertices[0], out_vertices[i + 1], out_vertices[i + 2]],
-            vertex_attributes: [out_attrs[0], out_attrs[i + 1], out_attrs[i + 2]],
-        });
-    }
-
-    debug_assert_eq!(out_vertices.len() - 2, out.len());
-
-    ClipResult::Clipped(out)
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
+
+    fn dump(verts: &[Point4D<ClipSpace>]) {
+        for (i, v) in verts.iter().enumerate() {
+            println!("v{} = [{}, {}, {}, {}]", i, v.x(), v.y(), v.z(), v.w());
+        }
+    }
 
     #[test]
     fn intersect_0() {
@@ -575,8 +468,6 @@ mod test {
 
     #[test]
     fn complete_coverage() {
-        // Initially some points are inside each axis so this triangle does not get caught
-        // by the early checks. After a few rounds of clipping though, it ends up with 0 inside.
         let vertices = [
             Point4D::<ClipSpace>::new(-10.70005131, 10.0005131, 1.3, 3.29994869),
             Point4D::<ClipSpace>::new(15.70005131, 0.0, 1.32306385, 1.3),
@@ -590,7 +481,6 @@ mod test {
         match try_clip(&tri) {
             ClipResult::Clipped(tris) => {
                 assert_eq!(tris.len(), 2);
-                //assert_eq!(tris[0].vertices, expected);
             }
             _ => unreachable!(),
         }
@@ -603,6 +493,7 @@ mod test {
             Point4D::<ClipSpace>::new(1.68917572, -2.40170431, 0.415791571, 2.40170407),
             Point4D::<ClipSpace>::new(1.68629396, -2.36931682, 0.415715098, 2.40162849),
         ];
+        dump(&vertices);
 
         let tri = Triangle {
             vertices,
@@ -616,8 +507,6 @@ mod test {
         }
     }
 
-    // START HERE:
-    // 1. There is a failing test in the unit tests in this file, this should be fixed.
     #[test]
     fn test_clipped_tris_are_inside() {
         // Test that clipping the result of the clipping are not clipped again...
