@@ -2,7 +2,6 @@ use std::time::Instant;
 
 mod camera;
 mod color;
-mod container;
 mod graphics_primitives;
 mod math;
 mod mesh;
@@ -135,6 +134,10 @@ fn setup_scene(mode: Mode) -> (Scene, Update) {
                         20.0 * sign * stage_progress / stage_duration,
                     );
                 }
+
+                // START HERE:
+                // 1. Improve --clip-test
+                // 2. Have another look at the complete_coverage
 
                 // TODO:
                 // * Partial near clipping with an angled (in z) triangle
