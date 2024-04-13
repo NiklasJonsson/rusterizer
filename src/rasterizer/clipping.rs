@@ -405,6 +405,7 @@ mod test {
         assert!(std::matches!(try_clip(&tri), ClipResult::Outside));
     }
 
+    // TODO: Understand this better?
     #[test]
     fn complete_coverage() {
         let vertices = [

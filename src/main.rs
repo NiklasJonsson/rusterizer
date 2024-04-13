@@ -105,14 +105,40 @@ fn setup_scene(mode: Mode) -> (Scene, Update) {
             (Scene { matrices, meshes }, Box::new(update))
         }
         Mode::ClipTest => {
+            // Here is some hackery to stress test the clipping
             let meshes = vec![mesh::triangle::<math::WorldSpace>()];
             let matrices = vec![math::Mat4::<math::WorldSpace>::identity(); meshes.len()];
             let update = |scene: &mut Scene, time: &Time| {
                 let elapsed = time.elapsed.as_secs_f32();
-                // This is hardcoded based on the current width/height of the window :(
-                scene.matrices[0] = math::rotate_z(elapsed * 0.5)
-                    * math::translate::<math::WorldSpace>(7.3, 0.0, 0.0)
-                    * math::rotate_z(elapsed * -0.5)
+                let stage_duration = 10.0;
+                let n_stages = 2;
+                // Create a loop of stages, each getting stage_duration seconds.
+                let loop_progress = elapsed % (stage_duration * n_stages as f32);
+                let stage = (loop_progress / stage_duration).floor() as u32;
+                let stage_progress = loop_progress % stage_duration;
+                if stage == 0 {
+                    // Triangle that "follows the window border" (rotate around z at approx window width)
+                    scene.matrices[0] = math::rotate_z(elapsed)
+                    // This is hardcoded based on the current width/height of the window :(
+                        * math::translate::<math::WorldSpace>(7.3, 0.0, 0.0)
+                        * math::rotate_z(-elapsed);
+                } else if stage == 1 {
+                    // * Fix the "sign" so that we test both near and far culling
+                    let sign = if stage_progress < (stage_duration / 2.0) {
+                        -1.0
+                    } else {
+                        1.0
+                    };
+                    scene.matrices[0] = math::translate::<math::WorldSpace>(
+                        0.0,
+                        0.0,
+                        20.0 * sign * stage_progress / stage_duration,
+                    );
+                }
+
+                // TODO:
+                // * Partial near clipping with an angled (in z) triangle
+                // * Massive triangle that covers the whole viewport
             };
             (Scene { matrices, meshes }, Box::new(update))
         }
